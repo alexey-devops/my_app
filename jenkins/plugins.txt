@@ -1,0 +1,11 @@
+workflow-aggregator
+git
+github
+github-branch-source
+pipeline-github
+credentials-binding
+junit
+ws-cleanup
+ansicolor
+timestamper
+matrix-auth
