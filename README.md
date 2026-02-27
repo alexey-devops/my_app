@@ -32,6 +32,17 @@
 - Docker / Docker Compose
 - GitHub Actions
 
+## DevOps-фокус
+
+- CI/CD pipeline для тестов, сборки и quality gates
+- Security scanning (Trivy + SARIF в GitHub Security)
+- Linting инфраструктурных артефактов (YAML, Dockerfile)
+- Dependabot для обновлений зависимостей
+- Release workflow для публикации образов в GHCR
+- Monitoring stack (Prometheus + Grafana + Loki + exporters)
+
+Детали: [DEVOPS.md](DEVOPS.md)
+
 ## Запуск локально
 
 1. Создать `.env` из шаблона:

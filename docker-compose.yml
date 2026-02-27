@@ -157,6 +157,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./compose/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./compose/monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus
     ports:
@@ -197,6 +198,32 @@ services:
       - "3100:3100"
     networks:
       - app_network
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4.1
+    container_name: nginx_exporter
+    restart: unless-stopped
+    command:
+      - -nginx.scrape-uri=http://nginx/nginx_status
+    ports:
+      - "9113:9113"
+    networks:
+      - app_network
+    depends_on:
+      - nginx
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.63.0
+    container_name: redis_exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - app_network
+    depends_on:
+      - redis
 
   # Private Docker Registry
   registry:
