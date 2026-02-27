@@ -1,5 +1,6 @@
 from logging.config import fileConfig
 import os
+from urllib.parse import quote_plus
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -46,7 +47,8 @@ def get_db_url():
             "PostgreSQL password is not configured. Set POSTGRES_PASSWORD or mount docker secret."
         )
 
-    return f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
+    safe_password = quote_plus(password)
+    return f"postgresql://{user}:{safe_password}@{host}:{port}/{db_name}"
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
