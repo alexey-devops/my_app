@@ -63,8 +63,8 @@ def test_health_endpoint(tmp_path, monkeypatch):
     db_file = tmp_path / "health.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
 
-    client = TestClient(api_main.app)
-    response = client.get("/health")
+    with TestClient(api_main.app) as client:
+        response = client.get("/health")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -74,32 +74,31 @@ def test_create_and_list_tasks(tmp_path, monkeypatch):
     db_file = tmp_path / "tasks.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
 
-    client = TestClient(api_main.app)
+    with TestClient(api_main.app) as client:
+        create_response = client.post("/tasks", json={"title": "  First task  "})
+        assert create_response.status_code == 201
+        created = create_response.json()
+        assert created["title"] == "First task"
+        assert created["status"] == "pending"
+        assert "id" in created
 
-    create_response = client.post("/tasks", json={"title": "  First task  "})
-    assert create_response.status_code == 201
-    created = create_response.json()
-    assert created["title"] == "First task"
-    assert created["status"] == "pending"
-    assert "id" in created
+        list_response = client.get("/tasks")
+        assert list_response.status_code == 200
+        tasks = list_response.json()
+        assert len(tasks) == 1
+        assert tasks[0]["title"] == "First task"
 
-    list_response = client.get("/tasks")
-    assert list_response.status_code == 200
-    tasks = list_response.json()
-    assert len(tasks) == 1
-    assert tasks[0]["title"] == "First task"
-
-    task_id = created["id"]
-    get_response = client.get(f"/tasks/{task_id}")
-    assert get_response.status_code == 200
-    assert get_response.json()["id"] == task_id
+        task_id = created["id"]
+        get_response = client.get(f"/tasks/{task_id}")
+        assert get_response.status_code == 200
+        assert get_response.json()["id"] == task_id
 
 
 def test_create_task_rejects_blank_title(tmp_path, monkeypatch):
     db_file = tmp_path / "tasks_invalid.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
 
-    client = TestClient(api_main.app)
-    response = client.post("/tasks", json={"title": "   "})
+    with TestClient(api_main.app) as client:
+        response = client.post("/tasks", json={"title": "   "})
 
     assert response.status_code == 422
