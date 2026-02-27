@@ -199,6 +199,22 @@ services:
     networks:
       - app_network
 
+  promtail:
+    image: grafana/promtail:2.5.0
+    container_name: promtail
+    restart: unless-stopped
+    profiles: ["logs"]
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./compose/monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app_network
+    depends_on:
+      - loki
+
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:1.4.1
     container_name: nginx_exporter
