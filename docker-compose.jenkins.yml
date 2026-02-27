@@ -1,18 +1,10 @@
 services:
   jenkins:
-    build:
-      context: ./jenkins
+    image: jenkins/jenkins:lts-jdk17
     container_name: jenkins
     restart: unless-stopped
-    user: "0:0"
-    environment:
-      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false"
-      JENKINS_ADMIN_ID: "admin"
-      JENKINS_ADMIN_PASSWORD: "admin123"
     ports:
       - "8081:8080"
       - "50000:50000"
     volumes:
       - ./.jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./:/workspace/my_app
