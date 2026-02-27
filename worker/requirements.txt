@@ -1,4 +1,9 @@
 redis==4.1.0
+feature/tasks-api-mvp
+SQLAlchemy==1.4.27
+psycopg2-binary==2.9.10
+=======
 SQLAlchemy==2.0.47
 psycopg2-binary==2.9.11
+main
 prometheus-client==0.20.0
