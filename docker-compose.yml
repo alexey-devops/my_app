@@ -170,6 +170,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 15s
     ports:
       - "127.0.0.1:3000:3000"
     networks:
