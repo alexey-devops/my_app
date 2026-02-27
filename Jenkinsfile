@@ -29,11 +29,6 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
-          python3 -m venv .venv
-          . .venv/bin/activate
-          pip install --upgrade pip
-          pip install -r api/requirements.txt -r worker/requirements.txt pytest pytest-cov
-
           mkdir -p secrets certs reports
           printf 'dummy-password' > secrets/postgres_password.txt
           printf 'dummy-password' > secrets/grafana_admin_password.txt
@@ -56,12 +51,20 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
-          . .venv/bin/activate
-          pytest -q api/tests worker/tests \
-            --junitxml=reports/pytest.xml \
-            --cov=api --cov=worker \
-            --cov-report=term \
-            --cov-report=xml:reports/coverage.xml
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -v "$PWD:/work" \
+            -w /work \
+            python:3.10-slim \
+            bash -lc "
+              python -m pip install --upgrade pip &&
+              pip install -r api/requirements.txt -r worker/requirements.txt pytest pytest-cov &&
+              pytest -q api/tests worker/tests \
+                --junitxml=reports/pytest.xml \
+                --cov=api --cov=worker \
+                --cov-report=term \
+                --cov-report=xml:reports/coverage.xml
+            "
         '''
       }
       post {
