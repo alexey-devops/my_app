@@ -30,10 +30,6 @@ pipeline {
         sh '''
           set -euxo pipefail
           cp .env.example .env
-          python3 -m venv .venv
-          . .venv/bin/activate
-          pip install --upgrade pip
-          pip install -r api/requirements.txt -r worker/requirements.txt pytest pytest-cov
           mkdir -p secrets certs reports
           printf 'dummy-password' > secrets/postgres_password.txt
           printf 'dummy-password' > secrets/grafana_admin_password.txt
@@ -56,12 +52,25 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
-          . .venv/bin/activate
-          pytest -q api/tests worker/tests \
-            --junitxml=reports/pytest.xml \
-            --cov=api --cov=worker \
-            --cov-report=term \
-            --cov-report=xml:reports/coverage.xml
+          TEST_CONTAINER="my-app-tests-${BUILD_NUMBER:-local}"
+          docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
+          docker create --name "$TEST_CONTAINER" -w /work python:3.10-slim bash -lc "
+            python -m pip install --upgrade pip &&
+            pip install -r api/requirements.txt -r worker/requirements.txt pytest pytest-cov &&
+            pytest -q api/tests worker/tests \
+              --junitxml=reports/pytest.xml \
+              --cov=api --cov=worker \
+              --cov-report=term \
+              --cov-report=xml:reports/coverage.xml
+          " >/dev/null
+          docker cp . "$TEST_CONTAINER":/work
+          if ! docker start -a "$TEST_CONTAINER"; then
+            docker cp "$TEST_CONTAINER":/work/reports/. reports/ || true
+            docker rm -f "$TEST_CONTAINER" || true
+            exit 1
+          fi
+          docker cp "$TEST_CONTAINER":/work/reports/. reports/
+          docker rm -f "$TEST_CONTAINER"
         '''
       }
       post {
