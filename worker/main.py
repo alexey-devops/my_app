@@ -1,6 +1,7 @@
 import os
 import time
 from functools import lru_cache
+from typing import Optional
 from urllib.parse import quote_plus
 
 from sqlalchemy import create_engine, text
@@ -64,7 +65,10 @@ def mask_database_url(db_url: str) -> str:
     return db_url
 
 
-def process_pending_tasks_once(limit: int = 10) -> int:
+def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Optional[float] = None) -> int:
+    if processing_delay_seconds is None:
+        processing_delay_seconds = float(os.environ.get("WORKER_PROCESSING_DELAY_SECONDS", "3"))
+
     query_select = text(
         "SELECT id, title FROM tasks WHERE status = 'pending' ORDER BY id ASC LIMIT :limit"
     )
@@ -80,21 +84,34 @@ def process_pending_tasks_once(limit: int = 10) -> int:
     )
 
     try:
-        with get_engine().begin() as conn:
+        with get_engine().connect() as conn:
             rows = conn.execute(query_select, {"limit": limit}).fetchall()
-            processed_count = 0
-            for row in rows:
+
+        processed_count = 0
+        for row in rows:
+            with get_engine().begin() as conn:
                 reserved = conn.execute(query_mark_in_progress, {"task_id": row.id})
                 if reserved.rowcount != 1:
                     continue
 
-                try:
-                    print(f"Processing task id={row.id} title={row.title}")
-                    conn.execute(query_mark_done, {"task_id": row.id})
-                except Exception:
+            print(
+                f"Task id={row.id} moved to in_progress. "
+                f"Will finish in {processing_delay_seconds} sec."
+            )
+            time.sleep(processing_delay_seconds)
+
+            try:
+                with get_engine().begin() as conn:
+                    updated = conn.execute(query_mark_done, {"task_id": row.id})
+                    if updated.rowcount != 1:
+                        continue
+            except Exception:
+                with get_engine().begin() as conn:
                     conn.execute(query_mark_failed, {"task_id": row.id})
-                processed_count += 1
-            return processed_count
+                continue
+
+            processed_count += 1
+        return processed_count
     except SQLAlchemyError as exc:
         print(f"Failed to process tasks: {exc}")
         return 0

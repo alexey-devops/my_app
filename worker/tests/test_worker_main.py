@@ -83,7 +83,7 @@ def test_process_pending_tasks_once(tmp_path, monkeypatch):
     conn.commit()
     conn.close()
 
-    processed_count = worker_main.process_pending_tasks_once()
+    processed_count = worker_main.process_pending_tasks_once(processing_delay_seconds=0)
     assert processed_count == 2
 
     conn = sqlite3.connect(db_file)
