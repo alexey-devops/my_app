@@ -1,59 +1,61 @@
-# Jenkins Setup for This Repository
+# Jenkins Setup (Repository Pipeline)
 
-## 1) Jenkins plugins
+## 1) Plugins
 
-Install plugins:
+Минимально необходимые:
+
 - Pipeline
 - Git
-- GitHub Integration
-- GitHub Branch Source
+- GitHub / GitHub Integration
 - JUnit
-- Workspace Cleanup
-- ANSI Color
 - Timestamper
 
-## 2) Jenkins credentials
+Опционально:
 
-Create credentials in Jenkins:
-- `github-pat` (Kind: Secret text)
-  - value: your GitHub PAT with `repo` scope
+- Blue Ocean
 
-## 3) Create pipeline job
+Примечание: `ansiColor` и `ws-cleanup` pipeline не требует.
 
-Recommended: `Pipeline` job with `Pipeline script from SCM`.
+## 2) Credentials
 
-SCM settings:
+Создай credential для доступа к репозиторию:
+
+- ID: `github-pat`
+- Type: `Secret text`
+- Value: GitHub PAT со scope `repo`
+
+## 3) Pipeline job
+
+Тип: `Pipeline` -> `Pipeline script from SCM`
+
 - SCM: `Git`
 - Repository URL: `https://github.com/alexey-devops/my_app.git`
 - Credentials: `github-pat`
-- Branch specifier: `*/feature/*` and `*/main` (or `*/**`)
+- Branch: `*/main`
 - Script Path: `Jenkinsfile`
 
-## 4) GitHub webhook
+## 4) Agent requirements
 
-In GitHub repository settings -> Webhooks:
-- Payload URL: `http://<jenkins-host>:8080/github-webhook/`
-- Content type: `application/json`
-- Events: `Just the push event` (and PR if needed)
+Текущий `Jenkinsfile` запускает автотесты внутри `python:3.10-slim` контейнера, поэтому от Jenkins/агента требуется:
 
-## 5) Agent requirements
+- Docker CLI + доступ к Docker daemon
+- Docker Compose v2 (`docker compose`)
+- доступ в интернет для установки pip dependencies внутри test container
 
-Jenkins agent must have:
-- `python3` and `python3-venv`
-- `docker` + `docker compose`
-- access to Docker daemon (`docker` group)
+## 5) Stage breakdown
 
-## 6) What pipeline does
+1. `Checkout`
+2. `Prepare CI Environment`
+3. `Validate Compose`
+4. `Autotests`
+5. `Build Docker Images`
 
-- validates `docker-compose.yml`
-- runs `pytest api/tests worker/tests`
-- publishes JUnit report
-- builds Docker images (`api`, `worker`, `frontend`)
+## 6) Автозапуск по push (webhook)
 
-## 7) Interview demo checklist
-
-1. Make code change and push to feature branch.
-2. Show Jenkins build auto-start from webhook.
-3. Open stages and test report in Jenkins UI.
-4. Show successful image build stage.
-5. Merge only after green pipeline.
+1. В Jenkins job включи trigger:
+   `GitHub hook trigger for GITScm polling`.
+2. В GitHub Repo -> Settings -> Webhooks:
+   - Payload URL: `http://<jenkins-host>:8080/github-webhook/`
+   - Content type: `application/json`
+   - Event: `Just the push event`
+3. Проверь `Recent Deliveries` в GitHub (ожидается HTTP 200).

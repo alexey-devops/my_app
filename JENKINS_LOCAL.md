@@ -1,44 +1,50 @@
-# Local Jenkins in this repository
+# Local Jenkins (docker-compose.jenkins.yml)
 
-## Start
+## Запуск
 
 ```bash
 docker compose -f docker-compose.jenkins.yml up -d --build
 ```
 
-## Open UI
+Jenkins UI:
 
-- URL: `http://localhost:8081`
-- Login: `admin`
-- Password: `admin123`
-- Blue Ocean UI (after plugin install): `http://localhost:8081/blue`
+- `http://localhost:8081`
 
-## Stop
+Порты в compose привязаны к `127.0.0.1`.
+
+## Локальный админ-пользователь
+
+`jenkins/init.groovy.d/01-security.groovy` на старте создаёт локального admin user.
+
+Переменные:
+
+- `JENKINS_ADMIN_USER` (default: `admin`)
+- `JENKINS_ADMIN_PASSWORD`
+
+Если `JENKINS_ADMIN_PASSWORD` пустой, генерируется одноразовый пароль и выводится в логи контейнера:
+
+```bash
+docker logs jenkins | tail -n 50
+```
+
+## Остановка
 
 ```bash
 docker compose -f docker-compose.jenkins.yml down
 ```
 
-## Pipeline setup in UI
+## Рекомендуемая настройка job
 
-1. `New Item` -> `Pipeline` -> name: `my_app_pipeline`
-2. `Pipeline` -> `Pipeline script from SCM`
-3. SCM: `Git`
-4. Repository URL: `https://github.com/alexey-devops/my_app.git`
-5. Branch: `*/feature/tasks-api-mvp` (or `*/main`)
-6. Script Path: `Jenkinsfile`
-7. Save -> `Build Now`
+1. `New Item` -> `Pipeline`
+2. `Pipeline script from SCM`
+3. Repository: `https://github.com/alexey-devops/my_app.git`
+4. Branch: `*/main`
+5. Script path: `Jenkinsfile`
 
-## Webhook
+## Что делает pipeline
 
-In GitHub repository settings add webhook:
-- `http://<your-host>:8081/github-webhook/`
-- event: `push`
-
-## What pipeline does
-
-- validates `docker-compose.yml`
-- runs autotests `pytest api/tests worker/tests`
-- publishes JUnit report (`reports/pytest.xml`)
-- generates coverage report (`reports/coverage.xml`)
-- builds Docker images (`api`, `worker`, `frontend`)
+- проверяет `docker-compose.yml`
+- запускает автотесты `pytest` в Python 3.10 контейнере
+- публикует JUnit (`reports/pytest.xml`)
+- публикует coverage (`reports/coverage.xml`)
+- собирает Docker images (`api`, `worker`, `frontend`)

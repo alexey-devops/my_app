@@ -1,61 +1,60 @@
-# DevOps Toolkit in This Project
+# DevOps Practices in This Project
 
-Этот документ описывает DevOps-практики и инструменты, которые реализованы в проекте для демонстрации инженерной зрелости.
+Документ фиксирует, какие DevOps-практики реально реализованы в репозитории.
 
-## CI/CD
+## 1. CI/CD
 
-### Jenkins Pipeline
+- Центр CI: Jenkins (`Jenkinsfile` в корне).
+- GitHub Actions в репозитории отключены (`.github/workflows-disabled/`).
+- Проверки в pipeline:
+  - compose config validation;
+  - Python autotests (`pytest`);
+  - публикация JUnit report;
+  - сборка Docker images.
 
-- `Jenkinsfile` (корень репозитория)
-  - `Checkout`
-  - `Prepare CI Environment` (venv + deps + test fixtures)
-  - `Validate Compose`
-  - `Unit Tests` (`pytest` + JUnit report)
-  - `Build Docker Images` (api/worker/frontend)
+## 2. Контейнеризация
 
-### GitHub role
+- Все сервисы запускаются через Docker Compose.
+- Отдельные Dockerfiles для `api`, `worker`, `frontend`, `jenkins`.
+- Runtime в `api` и `worker` выполняется под non-root пользователем.
 
-- GitHub используется как source-of-truth для репозитория.
-- Автозапуск CI через GitHub Actions отключён:
-  - workflow-файлы перенесены в `.github/workflows-disabled/`
+## 3. Secrets management
 
-## Dependency Management
+- БД и Grafana пароли передаются через Docker secrets:
+  - `secrets/postgres_password.txt`
+  - `secrets/grafana_admin_password.txt`
+- В compose не используется пароль в `DATABASE_URL` для приложений.
 
-- Зависимости ревьюятся и обновляются через обычный git-flow с прогоном Jenkins pipeline.
+## 4. Наблюдаемость
 
-## Quality Gates
-
-- `.yamllint.yml` — правила линтинга YAML
-- `.hadolint.yaml` — правила линтинга Dockerfile
-- `.pre-commit-config.yaml` — pre-commit hooks:
-  - check-yaml
-  - trailing-whitespace
-  - end-of-file-fixer
-  - detect-private-key
-  - check-added-large-files
-
-## Monitoring
-
-- Prometheus + Grafana + Loki в `docker-compose.yml`
+- Метрики: Prometheus.
+- Дашборды: Grafana.
+- Логи: Loki + Promtail.
 - Exporters:
   - `nginx-prometheus-exporter`
   - `redis_exporter`
-- Prometheus rules:
-  - `compose/monitoring/prometheus/alert_rules.yml` (`TargetDown`)
+- Алерты: `compose/monitoring/prometheus/alert_rules.yml`.
 
-## Local Ops Commands
+## 5. Качество и репозиторий
 
-Через `Makefile`:
+- Pre-commit hooks (`.pre-commit-config.yaml`):
+  - YAML checks
+  - detect-private-key
+  - merge-conflict check
+  - whitespace and EOF hygiene
+- Dependabot (`.github/dependabot.yml`) для pip и GitHub Actions зависимостей.
 
-- `make compose-validate` — проверка compose-конфига
-- `make lint-yaml` — линт YAML
-- `make lint-dockerfiles` — линт Dockerfile
-- `make test` — Python-тесты
-- `make up / make down` — запуск/остановка стека
+## 6. Operational defaults
 
-## Release Flow (recommended)
+- Порты хоста по умолчанию привязаны к `127.0.0.1`.
+- `Makefile` использует `docker compose` (не legacy `docker-compose`).
+- `make test` гоняет тесты в изолированном Python 3.10 контейнере.
 
-1. Push в feature-ветку.
-2. Jenkins запускает pipeline по webhook.
-3. После зелёного pipeline — merge в `main`.
-4. Jenkins release job (отдельная) собирает и публикует образы в registry.
+## 7. Ограничения демо-окружения
+
+- Проект ориентирован на локальное/демо окружение.
+- Для production отдельно нужны:
+  - vault/KMS для секретов;
+  - внешние TLS-сертификаты;
+  - отдельные role-based права и сегментация сети;
+  - hardening host OS и Docker daemon.

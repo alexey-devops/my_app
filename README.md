@@ -1,116 +1,87 @@
-# My App: Tasks Platform Demo
+# My App: Task Lifecycle Platform
 
-Демонстрационный full-stack проект на Docker Compose: API, worker, PostgreSQL, Redis, Nginx и стек наблюдаемости.
+Демонстрационный DevOps-oriented проект: API + worker + UI + мониторинг + Jenkins CI.
 
-## Что реализовано
+## Что внутри
 
-- `API (FastAPI)`:
-  - `GET /health`
-  - `POST /tasks` — создать задачу
-  - `GET /tasks` — список задач с фильтрацией по статусу и пагинацией
-  - `GET /tasks/{id}` — получить задачу
-  - `PATCH /tasks/{id}/status` — изменить статус
-- `Worker`:
-  - выбирает задачи `pending`
-  - резервирует в `in_progress`
-  - переводит в `done` (или `failed` при ошибке)
-- `Frontend`:
-  - живой dashboard задач
-  - создание задач, фильтр и смена статуса
-- `DB schema`:
-  - Alembic ревизия `20260227_01` для таблицы `tasks`
-- `CI`:
-  - запуск unit/integration-тестов
-  - сборка Docker-образов
+- `api/` - FastAPI сервис для задач.
+- `worker/` - фоновый обработчик жизненного цикла задач.
+- `frontend/` - веб-интерфейс для управления задачами.
+- `nginx/` - единая точка входа с HTTPS.
+- `compose/monitoring/` - Prometheus, Grafana, Loki, exporters.
+- `Jenkinsfile` - основной CI pipeline.
 
-## Технологии
+## Жизненный цикл задач
 
-- Python 3.10
-- FastAPI + SQLAlchemy + Alembic
-- PostgreSQL, Redis
-- Nginx
-- Docker / Docker Compose
-- Jenkins
+- `pending` -> `in_progress` -> `done`
+- В `failed` задача попадает, если:
+  - в title есть маркер `[FAIL]`, или
+  - срабатывает вероятностная ошибка `WORKER_FAILURE_RATE`.
+- Для `failed` в UI доступен `Retry` (перевод обратно в `pending`).
 
-## DevOps-фокус
+## Быстрый старт
 
-- CI/CD pipeline для тестов, сборки и quality gates
-- Централизованный CI в Jenkins (без запуска GitHub Actions)
-- Linting инфраструктурных артефактов (YAML, Dockerfile)
-- Dependabot для обновлений зависимостей
-- Release workflow для публикации образов в GHCR
-- Monitoring stack (Prometheus + Grafana + Loki + exporters)
-
-Детали: [DEVOPS.md](DEVOPS.md)
-
-## Запуск локально
-
-1. Создать `.env` из шаблона:
+1. Создать `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Заполнить секреты:
+2. Подготовить секреты:
 
 ```bash
+mkdir -p secrets certs
 echo "<postgres-password>" > secrets/postgres_password.txt
 echo "<grafana-password>" > secrets/grafana_admin_password.txt
 ```
 
-3. Поднять стек:
+3. Поднять сервисы:
 
 ```bash
 make up
 ```
 
-4. Открыть сервисы:
+4. Проверить:
 
-- Frontend: `https://localhost:8443/`
-- API через Nginx: `https://localhost:8443/api/health`
+- UI: `https://localhost:8443/`
+- API: `https://localhost:8443/api/health`
 - Grafana: `https://localhost:8443/grafana/`
 - Prometheus: `https://localhost:8443/prometheus/`
 
-## Миграции
+## Безопасные дефолты
 
-Применить все миграции:
-
-```bash
-make db-migrate-head
-```
-
-Создать новую ревизию:
-
-```bash
-make db-revision MESSAGE="описание"
-```
+- Пароли не передаются через `DATABASE_URL` в compose.
+- Пароли читаются из Docker secrets (`/run/secrets/...`).
+- Внешние порты по умолчанию привязаны к `127.0.0.1`.
+- `GET /` в API не раскрывает информацию о строке подключения к БД.
 
 ## Тесты
+
+Запуск в изолированном контейнере Python 3.10 (как в Jenkins):
 
 ```bash
 make test
 ```
 
-## CI через Jenkins
+## CI (Jenkins)
 
-- Основной pipeline: `Jenkinsfile` в корне репозитория
-- Рекомендованный тип job: `Pipeline script from SCM` (GitHub webhook -> Jenkins)
-- Статусы и логи проверок смотреть в Jenkins build:
-  - `Validate Compose`
-  - `Unit Tests`
-  - `Build Docker Images`
+Pipeline стадии:
 
-## Структура
+1. `Checkout`
+2. `Prepare CI Environment`
+3. `Validate Compose`
+4. `Autotests`
+5. `Build Docker Images`
 
-- `api/` — REST API + Alembic + тесты
-- `worker/` — обработчик фоновых задач + тесты
-- `frontend/` — статический UI (Nginx)
-- `compose/monitoring/` — Prometheus/Grafana/Loki
-- `nginx/` — reverse proxy конфигурация
+Подробная настройка:
 
-## Статусы задач
+- [JENKINS.md](JENKINS.md)
+- [JENKINS_LOCAL.md](JENKINS_LOCAL.md)
+- [DEVOPS.md](DEVOPS.md)
 
-- `pending`
-- `in_progress`
-- `done`
-- `failed`
+## Структура статусов API
+
+- `POST /tasks`
+- `GET /tasks?status=<status>&limit=<n>&offset=<n>`
+- `GET /tasks/{id}`
+- `PATCH /tasks/{id}/status`
