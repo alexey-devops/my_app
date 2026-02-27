@@ -1,0 +1,240 @@
+version: '3.8'
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  db_data:
+  registry_data:
+  nginx_certs:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  backup_data:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
+
+services:
+  db:
+    image: postgres:13-alpine
+    container_name: db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    secrets:
+      - postgres_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:6-alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} # This will need to be adjusted to read from secret file if the API connects using it
+      REDIS_URL: redis://${REDIS_HOST}:${REDIS_PORT}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password # Exposing for internal app use if needed
+    networks:
+      - app_network
+    secrets:
+      - postgres_password
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${API_PORT}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} # This will need to be adjusted to read from secret file if the Worker connects using it
+      REDIS_URL: redis://${REDIS_HOST}:${REDIS_PORT}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password # Exposing for internal app use if needed
+    networks:
+      - app_network
+    secrets:
+      - postgres_password
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "true"] # Placeholder for now, replace with actual worker health check later
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    networks:
+      - app_network
+    depends_on:
+      api:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    environment:
+      NGINX_HTTP_PORT: ${NGINX_HTTP_PORT}
+      NGINX_HTTPS_PORT: ${NGINX_HTTPS_PORT}
+    ports:
+      - published: "8080"
+        target: 80
+        protocol: tcp
+        mode: ingress
+      - published: "8443"
+        target: 443
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - app_network
+    depends_on:
+      frontend:
+        condition: service_started
+      api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:v2.37.0
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./compose/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - app_network
+
+  grafana:
+    image: grafana/grafana:8.5.2
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./compose/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./compose/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+    ports:
+      - "3000:3000"
+    networks:
+      - app_network
+    secrets:
+      - grafana_admin_password
+    depends_on:
+      - prometheus
+      - loki
+
+  loki:
+    image: grafana/loki:2.5.0
+    container_name: loki
+    restart: unless-stopped
+    volumes:
+      - ./compose/monitoring/loki/config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/config.yml
+    ports:
+      - "3100:3100"
+    networks:
+      - app_network
+
+  # Private Docker Registry
+  registry:
+    image: registry:2
+    container_name: registry
+    restart: unless-stopped
+    volumes:
+      - registry_data:/var/lib/registry
+    ports:
+      - "5000:5000"
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/v2/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Backup Service
+  backup:
+    image: prodrigestivill/postgres-backup-local
+    container_name: postgres_backup
+    restart: unless-stopped
+    volumes:
+      - backup_data:/backups
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      SCHEDULE: "@daily" # Daily backup at midnight
+      BACKUP_CLEANUP_TIME: "7D" # Keep backups for 7 days
+    networks:
+      - app_network
+    secrets:
+      - postgres_password
+    depends_on:
+      - db

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Application</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        .container {
+            text-align: center;
+            padding: 2em;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #007bff;
+        }
+        p {
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to the Frontend!</h1>
+        <p>This is a placeholder for your awesome application.</p>
+        <p>API status: <span id="apiStatus">Loading...</span></p>
+    </div>
+
+    <script>
+        // Basic script to check API status (example)
+        fetch('/api/health')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('apiStatus').innerText = data.status === 'ok' ? 'Online' : 'Offline';
+                document.getElementById('apiStatus').style.color = data.status === 'ok' ? 'green' : 'red';
+            })
+            .catch(error => {
+                document.getElementById('apiStatus').innerText = 'Error fetching API status';
+                document.getElementById('apiStatus').style.color = 'red';
+                console.error('Error:', error);
+            });
+    </script>
+</body>
+</html>

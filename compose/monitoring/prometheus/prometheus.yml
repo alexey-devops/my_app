@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80'] # Assuming Nginx exposes metrics on port 80, will need to configure Nginx accordingly
+    metrics_path: /nginx_status # Example metrics path
+
+  - job_name: 'cadvisor' # Example for host metrics, typically run on host or as a separate container
+    static_configs:
+      - targets: ['cadvisor:8080'] # Replace with actual cAdvisor address
+
+  # Add other services later (API, Worker, etc.)
