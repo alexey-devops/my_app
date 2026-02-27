@@ -21,7 +21,7 @@
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
       "id": 2,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"expr": "sum(ALERTS{alertstate=\"firing\"})", "refId": "A"}],
+      "targets": [{"expr": "sum(ALERTS{alertstate=\"firing\"}) or vector(0)", "refId": "A"}],
       "title": "Firing Alerts",
       "type": "stat"
     },
@@ -31,7 +31,7 @@
       "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
       "id": 3,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"expr": "max(redis_up)", "refId": "A"}],
+      "targets": [{"expr": "max(redis_up) or vector(0)", "refId": "A"}],
       "title": "Redis Up",
       "type": "stat"
     },
@@ -41,7 +41,7 @@
       "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
       "id": 4,
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"expr": "max(nginx_connections_active)", "refId": "A"}],
+      "targets": [{"expr": "max(nginx_connections_active) or vector(0)", "refId": "A"}],
       "title": "Nginx Active Connections",
       "type": "stat"
     },
@@ -61,7 +61,7 @@
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
       "id": 6,
       "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "single", "sort": "none"}},
-      "targets": [{"expr": "sum(rate(nginx_http_requests_total[1m]))", "legendFormat": "nginx rps", "refId": "A"}],
+      "targets": [{"expr": "sum(rate(nginx_http_requests_total[$__rate_interval])) or vector(0)", "legendFormat": "nginx rps", "refId": "A"}],
       "title": "Nginx Request Rate",
       "type": "timeseries"
     },
@@ -86,12 +86,12 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "15s",
+  "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["devops", "platform", "demo"],
   "templating": {"list": []},
-  "time": {"from": "now-30m", "to": "now"},
+  "time": {"from": "now-6h", "to": "now"},
   "timepicker": {},
   "timezone": "",
   "title": "Platform Overview",

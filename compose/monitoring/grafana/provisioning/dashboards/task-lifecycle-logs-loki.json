@@ -37,7 +37,7 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=~\"worker|my_app-worker\"} |= \"\\\"event\\\":\\\"task_transition\\\"\" [15m]))",
+          "expr": "sum(count_over_time({job=~\"worker|my_app-worker\"} |= \"\\\"event\\\":\\\"task_transition\\\"\" [15m])) or vector(0)",
           "legendFormat": "transitions",
           "refId": "A"
         }
@@ -75,7 +75,7 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=~\"worker|my_app-worker\"} |= \"\\\"event\\\":\\\"task_transition\\\"\" |= \"\\\"to_status\\\":\\\"failed\\\"\" [15m]))",
+          "expr": "sum(count_over_time({job=~\"worker|my_app-worker\"} |= \"\\\"event\\\":\\\"task_transition\\\"\" |= \"\\\"to_status\\\":\\\"failed\\\"\" [15m])) or vector(0)",
           "legendFormat": "failed",
           "refId": "A"
         }
@@ -113,7 +113,7 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=~\"api|my_app-api\"} |= \"\\\"event\\\":\\\"task_status_updated\\\"\" |= \"\\\"to_status\\\":\\\"pending\\\"\" [15m]))",
+          "expr": "sum(count_over_time({job=~\"api|my_app-api\"} |= \"\\\"event\\\":\\\"task_status_updated\\\"\" |= \"\\\"to_status\\\":\\\"pending\\\"\" [15m])) or vector(0)",
           "legendFormat": "retry",
           "refId": "A"
         }
@@ -148,9 +148,24 @@
       },
       "targets": [
         {
-          "expr": "sum by (to_status) (count_over_time({job=~\"worker|my_app-worker\"} | json | event=\"task_transition\" [1m]))",
-          "legendFormat": "{{to_status}}",
+          "expr": "sum(count_over_time({job=~\"worker|my_app-worker\"} |= \"\\\"event\\\":\\\"task_transition\\\"\" |= \"\\\"to_status\\\":\\\"pending\\\"\" [1m])) or vector(0)",
+          "legendFormat": "pending",
           "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=~\"worker|my_app-worker\"} |= \"\\\"event\\\":\\\"task_transition\\\"\" |= \"\\\"to_status\\\":\\\"in_progress\\\"\" [1m])) or vector(0)",
+          "legendFormat": "in_progress",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({job=~\"worker|my_app-worker\"} |= \"\\\"event\\\":\\\"task_transition\\\"\" |= \"\\\"to_status\\\":\\\"done\\\"\" [1m])) or vector(0)",
+          "legendFormat": "done",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(count_over_time({job=~\"worker|my_app-worker\"} |= \"\\\"event\\\":\\\"task_transition\\\"\" |= \"\\\"to_status\\\":\\\"failed\\\"\" [1m])) or vector(0)",
+          "legendFormat": "failed",
+          "refId": "D"
         }
       ],
       "title": "Transitions by Target Status (per minute)",
@@ -238,7 +253,7 @@
       "type": "logs"
     }
   ],
-  "refresh": "15s",
+  "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
@@ -266,7 +281,7 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {},
