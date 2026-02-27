@@ -1,10 +1,13 @@
+import json
 import os
 import random
 import time
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Optional
 from urllib.parse import quote_plus
 
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -53,6 +56,50 @@ def get_engine():
 
 def reset_engine_cache() -> None:
     get_engine.cache_clear()
+
+
+TASK_TRANSITIONS_TOTAL = Counter(
+    "task_lifecycle_transitions_total",
+    "Task lifecycle transitions performed by worker or system.",
+    ["from_status", "to_status", "source", "result"],
+)
+TASK_PROCESSING_SECONDS = Histogram(
+    "task_lifecycle_processing_seconds",
+    "Processing duration for task lifecycle finalization.",
+    buckets=(0.5, 1, 2, 3, 5, 8, 13, 21, 34),
+)
+TASK_STATUS_COUNT = Gauge(
+    "task_lifecycle_status_count",
+    "Current number of tasks by status from worker DB polling.",
+    ["status"],
+)
+KNOWN_STATUSES = ["pending", "in_progress", "done", "failed"]
+
+
+def log_event(event: str, **kwargs) -> None:
+    payload = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "component": "worker",
+        "event": event,
+    }
+    payload.update(kwargs)
+    print(json.dumps(payload, ensure_ascii=True))
+
+
+def refresh_status_metrics() -> None:
+    query = text("SELECT status, COUNT(*) AS c FROM tasks GROUP BY status")
+    counts = {status: 0 for status in KNOWN_STATUSES}
+    try:
+        with get_engine().connect() as conn:
+            rows = conn.execute(query).fetchall()
+            for row in rows:
+                if row.status in counts:
+                    counts[row.status] = int(row.c)
+    except SQLAlchemyError:
+        return
+
+    for status_name, value in counts.items():
+        TASK_STATUS_COUNT.labels(status=status_name).set(value)
 
 
 def mask_database_url(db_url: str) -> str:
@@ -107,10 +154,24 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
                 if reserved.rowcount != 1:
                     continue
 
-            print(
-                f"Task id={row.id} moved to in_progress. "
-                f"Will finish in {processing_delay_seconds} sec."
+            TASK_TRANSITIONS_TOTAL.labels(
+                from_status="pending",
+                to_status="in_progress",
+                source="worker",
+                result="success",
+            ).inc()
+            log_event(
+                "task_transition",
+                task_id=row.id,
+                title=row.title,
+                from_status="pending",
+                to_status="in_progress",
+                source="worker",
+                processing_delay_seconds=processing_delay_seconds,
             )
+            refresh_status_metrics()
+
+            started_at = time.monotonic()
             time.sleep(processing_delay_seconds)
 
             try:
@@ -120,13 +181,46 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
                     updated = conn.execute(query_mark_done, {"task_id": row.id})
                     if updated.rowcount != 1:
                         continue
+                TASK_TRANSITIONS_TOTAL.labels(
+                    from_status="in_progress",
+                    to_status="done",
+                    source="worker",
+                    result="success",
+                ).inc()
+                TASK_PROCESSING_SECONDS.observe(time.monotonic() - started_at)
+                log_event(
+                    "task_transition",
+                    task_id=row.id,
+                    title=row.title,
+                    from_status="in_progress",
+                    to_status="done",
+                    source="worker",
+                    result="success",
+                )
             except Exception:
                 with get_engine().begin() as conn:
                     conn.execute(query_mark_failed, {"task_id": row.id})
+                TASK_TRANSITIONS_TOTAL.labels(
+                    from_status="in_progress",
+                    to_status="failed",
+                    source="worker",
+                    result="error",
+                ).inc()
+                TASK_PROCESSING_SECONDS.observe(time.monotonic() - started_at)
+                log_event(
+                    "task_transition",
+                    task_id=row.id,
+                    title=row.title,
+                    from_status="in_progress",
+                    to_status="failed",
+                    source="worker",
+                    result="error",
+                )
             processed_count += 1
+            refresh_status_metrics()
         return processed_count
     except SQLAlchemyError as exc:
-        print(f"Failed to process tasks: {exc}")
+        log_event("worker_db_error", error=str(exc))
         return 0
 
 
@@ -147,9 +241,12 @@ def run_worker_loop(sleep_seconds: int = 5, iterations: int | None = None) -> No
 
 
 def main() -> None:
-    print("Worker started. Listening for tasks...")
+    metrics_port = int(os.environ.get("WORKER_METRICS_PORT", "9102"))
+    start_http_server(metrics_port)
+    refresh_status_metrics()
+    log_event("worker_started", metrics_port=metrics_port)
     db_url = get_database_url()
-    print(f"Worker using DB URL: {mask_database_url(db_url)}")
+    log_event("worker_db_ready", database_url_masked=mask_database_url(db_url))
     run_worker_loop()
 
 
