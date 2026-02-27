@@ -91,8 +91,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} # This will need to be adjusted to read from secret file if the Worker connects using it
       REDIS_URL: redis://${REDIS_HOST}:${REDIS_PORT}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password # Exposing for internal app use if needed
+      WORKER_METRICS_PORT: 9102
     networks:
       - app_network
+    expose:
+      - "9102"
     secrets:
       - postgres_password
     depends_on:
@@ -157,6 +160,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./compose/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./compose/monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus
     ports:
@@ -197,6 +201,46 @@ services:
       - "3100:3100"
     networks:
       - app_network
+
+  promtail:
+    image: grafana/promtail:2.5.0
+    container_name: promtail
+    restart: unless-stopped
+    profiles: ["logs"]
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./compose/monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app_network
+    depends_on:
+      - loki
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.4.1
+    container_name: nginx_exporter
+    restart: unless-stopped
+    command:
+      - -nginx.scrape-uri=http://nginx/nginx_status
+    ports:
+      - "9113:9113"
+    networks:
+      - app_network
+    depends_on:
+      - nginx
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.63.0
+    container_name: redis_exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - app_network
+    depends_on:
+      - redis
 
   # Private Docker Registry
   registry:

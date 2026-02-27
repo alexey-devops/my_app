@@ -1,0 +1,11 @@
+groups:
+  - name: platform-health
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target is down"
+          description: "Target {{ $labels.instance }} in job {{ $labels.job }} has been down for more than 2 minutes."

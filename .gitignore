@@ -224,3 +224,4 @@ secrets/
 certs/
 *.pem
 config_output.yaml
+.jenkins_home/

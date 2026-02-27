@@ -1,55 +1,629 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Frontend Application</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            color: #333;
-        }
-        .container {
-            text-align: center;
-            padding: 2em;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #007bff;
-        }
-        p {
-            font-size: 1.2em;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow Control Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg-1: #090f1f;
+      --bg-2: #111a31;
+      --surface: rgba(255, 255, 255, 0.92);
+      --surface-2: rgba(248, 250, 255, 0.8);
+      --line: rgba(15, 23, 42, 0.1);
+      --text-1: #0f172a;
+      --text-2: #475569;
+      --brand: #0ea5e9;
+      --brand-2: #0284c7;
+      --ok: #16a34a;
+      --warn: #f59e0b;
+      --danger: #dc2626;
+      --pending: #6366f1;
+      --radius-lg: 20px;
+      --radius-md: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      font-family: "Manrope", sans-serif;
+      color: var(--text-1);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(34, 211, 238, 0.28), transparent 35%),
+        radial-gradient(circle at 88% 88%, rgba(14, 165, 233, 0.24), transparent 40%),
+        linear-gradient(165deg, var(--bg-1), var(--bg-2));
+      padding: 22px;
+    }
+
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.95));
+      backdrop-filter: blur(6px);
+      box-shadow: 0 26px 50px rgba(2, 6, 23, 0.35);
+      overflow: hidden;
+      animation: lift 0.35s ease-out;
+    }
+
+    .topbar {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      background: linear-gradient(135deg, #f8fbff, #eef7ff);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.03em;
+    }
+
+    .title {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      letter-spacing: 0.01em;
+      font-size: clamp(1.15rem, 2vw, 1.55rem);
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--text-2);
+      font-size: 0.9rem;
+    }
+
+    .health {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-2);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      background: #94a3b8;
+      box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.14);
+    }
+
+    .dot.ok {
+      background: var(--ok);
+      box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.14);
+    }
+
+    .dot.err {
+      background: var(--danger);
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.14);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      padding: 16px;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 1.05rem;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface-2);
+      padding: 10px;
+    }
+
+    .kpi-label {
+      color: var(--text-2);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .kpi-value {
+      margin-top: 6px;
+      font-weight: 800;
+      font-size: 1.2rem;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    input,
+    select,
+    button {
+      font: inherit;
+      border-radius: var(--radius-md);
+      min-height: 42px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: var(--text-1);
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: rgba(14, 165, 233, 0.85);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.16);
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      color: #fff;
+      padding: 10px 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    button:hover {
+      filter: brightness(0.97);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.ghost {
+      color: var(--text-1);
+      background: #e2e8f0;
+      font-weight: 600;
+    }
+
+    button.retry {
+      background: linear-gradient(135deg, #fb923c, #f97316);
+    }
+
+    .muted {
+      color: var(--text-2);
+      margin: 8px 0 0;
+      font-size: 0.9rem;
+    }
+
+    .tasks {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .task {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      animation: pop 0.2s ease-out;
+    }
+
+    .task-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .task-title {
+      font-weight: 700;
+      max-width: 100%;
+      word-break: break-word;
+    }
+
+    .badge {
+      color: #fff;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 800;
+    }
+
+    .pending { background: var(--pending); }
+    .in_progress { background: var(--warn); }
+    .done { background: var(--ok); }
+    .failed { background: var(--danger); }
+
+    .task-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .task-actions button {
+      min-height: 34px;
+      padding: 6px 11px;
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
+
+    .task-actions button[disabled] {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      background: #0f172a;
+      color: #fff;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.88rem;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 150ms ease, transform 150ms ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @keyframes lift {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pop {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 980px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Welcome to the Frontend!</h1>
-        <p>This is a placeholder for your awesome application.</p>
-        <p>API status: <span id="apiStatus">Loading...</span></p>
-    </div>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">TF</div>
+        <div>
+          <h1 class="title">TaskFlow Control Panel</h1>
+          <p class="subtitle">Operations-ready task lifecycle monitor</p>
+        </div>
+      </div>
+      <div class="health" id="apiState">
+        <span class="dot" id="apiDot"></span>
+        <span id="apiText">Checking API...</span>
+      </div>
+    </header>
 
-    <script>
-        // Basic script to check API status (example)
-        fetch('/api/health')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('apiStatus').innerText = data.status === 'ok' ? 'Online' : 'Offline';
-                document.getElementById('apiStatus').style.color = data.status === 'ok' ? 'green' : 'red';
-            })
-            .catch(error => {
-                document.getElementById('apiStatus').innerText = 'Error fetching API status';
-                document.getElementById('apiStatus').style.color = 'red';
-                console.error('Error:', error);
-            });
-    </script>
+    <section class="layout">
+      <aside class="panel">
+        <h2>Overview</h2>
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="kpi-label">Total</div>
+            <div class="kpi-value" id="kpiTotal">0</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Pending</div>
+            <div class="kpi-value" id="kpiPending">0</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">In Progress</div>
+            <div class="kpi-value" id="kpiProgress">0</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Failed</div>
+            <div class="kpi-value" id="kpiFailed">0</div>
+          </div>
+        </div>
+
+        <h2>Create Task</h2>
+        <div class="row">
+          <input id="taskInput" type="text" maxlength="255" placeholder="Example: Generate deployment report" />
+        </div>
+        <div class="row" style="margin-top: 10px;">
+          <button id="createBtn" style="width:100%;">Create Task</button>
+        </div>
+        <p class="muted">Tip: include <strong>[FAIL]</strong> in title to test retry flow.</p>
+      </aside>
+
+      <section class="panel">
+        <h2>Task Queue</h2>
+        <div class="row">
+          <select id="statusFilter" style="max-width: 220px;">
+            <option value="">All statuses</option>
+            <option value="pending">pending</option>
+            <option value="in_progress">in_progress</option>
+            <option value="done">done</option>
+            <option value="failed">failed</option>
+          </select>
+          <button class="ghost" id="refreshBtn">Refresh</button>
+        </div>
+        <p class="muted" id="summary">Loading tasks...</p>
+        <div class="tasks" id="tasks"></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const apiDot = document.getElementById("apiDot");
+    const apiText = document.getElementById("apiText");
+    const taskInput = document.getElementById("taskInput");
+    const createBtn = document.getElementById("createBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const statusFilter = document.getElementById("statusFilter");
+    const tasksRoot = document.getElementById("tasks");
+    const summary = document.getElementById("summary");
+    const toast = document.getElementById("toast");
+
+    const kpiTotal = document.getElementById("kpiTotal");
+    const kpiPending = document.getElementById("kpiPending");
+    const kpiProgress = document.getElementById("kpiProgress");
+    const kpiFailed = document.getElementById("kpiFailed");
+
+    let allTasksCache = [];
+    let lastRenderSignature = "";
+    let autoRefreshHandle = null;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2200);
+    }
+
+    async function checkHealth() {
+      try {
+        const response = await fetch("/api/health");
+        if (!response.ok) throw new Error("bad status");
+        const data = await response.json();
+        if (data.status !== "ok") throw new Error("bad payload");
+        apiDot.className = "dot ok";
+        apiText.textContent = "API is healthy";
+      } catch {
+        apiDot.className = "dot err";
+        apiText.textContent = "API is unavailable";
+      }
+    }
+
+    async function fetchTasks(filter = "") {
+      const params = new URLSearchParams();
+      if (filter) params.set("status", filter);
+      params.set("limit", "100");
+      const qs = params.toString();
+      const url = qs ? `/api/tasks?${qs}` : "/api/tasks";
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to load tasks: ${response.status}`);
+      return response.json();
+    }
+
+    function updateKPIs(tasks) {
+      kpiTotal.textContent = tasks.length;
+      kpiPending.textContent = tasks.filter(t => t.status === "pending").length;
+      kpiProgress.textContent = tasks.filter(t => t.status === "in_progress").length;
+      kpiFailed.textContent = tasks.filter(t => t.status === "failed").length;
+    }
+
+    async function updateTaskStatus(taskId, status) {
+      const response = await fetch(`/api/tasks/${taskId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error(`Failed to update status: ${response.status}`);
+      return response.json();
+    }
+
+    async function retryTask(taskId) {
+      await updateTaskStatus(taskId, "pending");
+      showToast(`Task #${taskId} moved to pending`);
+      await renderTasks({ force: true });
+    }
+
+    function createStatusButton(label, nextStatus, currentStatus, taskId) {
+      const btn = document.createElement("button");
+      btn.className = "ghost";
+      btn.textContent = label;
+      btn.disabled = currentStatus === nextStatus;
+      btn.addEventListener("click", async () => {
+        try {
+          await updateTaskStatus(taskId, nextStatus);
+          showToast(`Task #${taskId} status updated`);
+          await renderTasks({ force: true });
+        } catch {
+          showToast("Failed to update task status");
+        }
+      });
+      return btn;
+    }
+
+    function taskCard(task, animate = true) {
+      const card = document.createElement("article");
+      card.className = "task";
+      if (!animate) {
+        card.style.animation = "none";
+      }
+
+      const head = document.createElement("div");
+      head.className = "task-head";
+
+      const title = document.createElement("div");
+      title.className = "task-title";
+      title.textContent = `#${task.id} ${task.title}`;
+
+      const badge = document.createElement("span");
+      badge.className = `badge ${task.status}`;
+      badge.textContent = task.status;
+
+      head.appendChild(title);
+      head.appendChild(badge);
+      card.appendChild(head);
+
+      const actions = document.createElement("div");
+      actions.className = "task-actions";
+
+      actions.appendChild(createStatusButton("Pending", "pending", task.status, task.id));
+      actions.appendChild(createStatusButton("In Progress", "in_progress", task.status, task.id));
+      actions.appendChild(createStatusButton("Done", "done", task.status, task.id));
+
+      if (task.status === "failed") {
+        const retry = document.createElement("button");
+        retry.className = "retry";
+        retry.textContent = "Retry";
+        retry.addEventListener("click", () => retryTask(task.id));
+        actions.appendChild(retry);
+      }
+
+      card.appendChild(actions);
+      return card;
+    }
+
+    function getTasksSignature(tasks) {
+      return JSON.stringify(
+        tasks.map(task => ({ id: task.id, status: task.status, title: task.title }))
+      );
+    }
+
+    async function renderTasks(options = {}) {
+      const { force = false, silent = false } = options;
+      try {
+        const freshTasks = await fetchTasks(statusFilter.value);
+        const freshSignature = getTasksSignature(freshTasks);
+
+        if (!force && freshSignature === lastRenderSignature) {
+          return;
+        }
+
+        allTasksCache = freshTasks;
+        lastRenderSignature = freshSignature;
+        tasksRoot.innerHTML = "";
+        updateKPIs(freshTasks);
+
+        if (freshTasks.length === 0) {
+          summary.textContent = "No tasks found for selected filter.";
+          return;
+        }
+
+        summary.textContent = `Showing ${freshTasks.length} task(s)`;
+        freshTasks.forEach(task => tasksRoot.appendChild(taskCard(task, !silent)));
+      } catch {
+        summary.textContent = "Failed to load tasks.";
+        tasksRoot.innerHTML = "";
+      }
+    }
+
+    async function createTask() {
+      const title = taskInput.value.trim();
+      if (!title) return;
+
+      createBtn.disabled = true;
+      try {
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        if (!response.ok) throw new Error(`create failed: ${response.status}`);
+        taskInput.value = "";
+        showToast("Task created");
+        await renderTasks({ force: true });
+      } catch {
+        showToast("Failed to create task");
+      } finally {
+        createBtn.disabled = false;
+      }
+    }
+
+    createBtn.addEventListener("click", createTask);
+    refreshBtn.addEventListener("click", () => renderTasks({ force: true }));
+    statusFilter.addEventListener("change", () => {
+      lastRenderSignature = "";
+      renderTasks({ force: true });
+    });
+    taskInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") createTask();
+    });
+
+    function startAutoRefresh() {
+      if (autoRefreshHandle) clearInterval(autoRefreshHandle);
+      autoRefreshHandle = setInterval(() => {
+        if (document.visibilityState === "visible") {
+          renderTasks({ silent: true });
+        }
+      }, 2000);
+    }
+
+    checkHealth();
+    renderTasks({ force: true });
+    startAutoRefresh();
+    setInterval(checkHealth, 10000);
+  </script>
 </body>
 </html>

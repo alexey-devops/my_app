@@ -1,4 +1,4 @@
-.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade
+.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles
 
 # Default to .env if not specified
 ENV_FILE ?= .env
@@ -58,3 +58,18 @@ logs:
 ps:
 	@echo "Listing Docker Compose services..."
 	docker-compose -f docker-compose.yml ps
+
+compose-validate:
+	@echo "Validating Docker Compose configuration..."
+	docker compose -f docker-compose.yml --env-file $(ENV_FILE) config >/tmp/compose.validated.yml
+	@echo "Compose config is valid."
+
+lint-yaml:
+	@echo "Linting YAML files with yamllint container..."
+	docker run --rm -v "$(PWD):/data" cytopia/yamllint -c /data/.yamllint.yml /data
+
+lint-dockerfiles:
+	@echo "Linting Dockerfiles with hadolint container..."
+	docker run --rm -i --entrypoint hadolint -v "$(PWD):/work" hadolint/hadolint --config /work/.hadolint.yaml /work/api/Dockerfile
+	docker run --rm -i --entrypoint hadolint -v "$(PWD):/work" hadolint/hadolint --config /work/.hadolint.yaml /work/worker/Dockerfile
+	docker run --rm -i --entrypoint hadolint -v "$(PWD):/work" hadolint/hadolint --config /work/.hadolint.yaml /work/frontend/Dockerfile

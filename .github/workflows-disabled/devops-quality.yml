@@ -1,0 +1,92 @@
+name: DevOps Quality
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feature/**]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  compose-validate:
+    name: Validate Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create minimal secrets for config validation
+        run: |
+          mkdir -p secrets certs
+          printf 'dummy-password' > secrets/postgres_password.txt
+          printf 'dummy-password' > secrets/grafana_admin_password.txt
+          printf 'dummy-cert' > certs/nginx-selfsigned.crt
+          printf 'dummy-key' > certs/nginx-selfsigned.key
+
+      - name: Validate docker compose config
+        run: docker compose -f docker-compose.yml --env-file .env.example config >/tmp/compose.validated.yml
+
+  lint-yaml:
+    name: Lint YAML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run yamllint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: .
+          config_file: .yamllint.yml
+          strict: false
+
+  lint-dockerfiles:
+    name: Lint Dockerfiles
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: api/Dockerfile
+          config: .hadolint.yaml
+
+      - name: Run hadolint (worker)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: worker/Dockerfile
+          config: .hadolint.yaml
+
+      - name: Run hadolint (frontend)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile
+          config: .hadolint.yaml
+
+  trivy-scan:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+
+      - name: Upload Trivy results to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif

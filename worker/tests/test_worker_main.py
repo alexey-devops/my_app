@@ -52,6 +52,22 @@ def test_get_database_url_from_database_url_env(monkeypatch):
     assert worker_main.get_database_url() == "sqlite:///./worker-local.db"
 
 
+def test_get_database_url_prefers_secret_over_database_url(tmp_path, monkeypatch):
+    secret_file = tmp_path / "worker-secret.txt"
+    secret_file.write_text("secret", encoding="utf-8")
+
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./worker-local.db")
+    monkeypatch.setenv("POSTGRES_USER", "worker")
+    monkeypatch.setenv("POSTGRES_DB", "tasks")
+    monkeypatch.setenv("POSTGRES_HOST", "db")
+    monkeypatch.setenv("POSTGRES_PORT", "5432")
+    monkeypatch.setenv("POSTGRES_PASSWORD_FILE", str(secret_file))
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+
+    url = worker_main.get_database_url()
+    assert url == "postgresql://worker:secret@db:5432/tasks"
+
+
 def test_process_pending_tasks_once(tmp_path, monkeypatch):
     db_file = tmp_path / "worker_tasks.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
@@ -67,7 +83,7 @@ def test_process_pending_tasks_once(tmp_path, monkeypatch):
     conn.commit()
     conn.close()
 
-    processed_count = worker_main.process_pending_tasks_once()
+    processed_count = worker_main.process_pending_tasks_once(processing_delay_seconds=0)
     assert processed_count == 2
 
     conn = sqlite3.connect(db_file)
@@ -76,6 +92,54 @@ def test_process_pending_tasks_once(tmp_path, monkeypatch):
     assert statuses == [("done",), ("done",)]
 
 
+def test_process_pending_tasks_marks_failed_by_title_marker(tmp_path, monkeypatch):
+    db_file = tmp_path / "worker_tasks_fail_marker.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+    monkeypatch.delenv("POSTGRES_PASSWORD_FILE", raising=False)
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    monkeypatch.setenv("WORKER_FAILURE_RATE", "0")
+
+    conn = sqlite3.connect(db_file)
+    conn.execute(
+        "CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, status TEXT NOT NULL, updated_at TEXT)"
+    )
+    conn.execute("INSERT INTO tasks (title, status) VALUES ('[FAIL] broken integration', 'pending')")
+    conn.commit()
+    conn.close()
+
+    processed_count = worker_main.process_pending_tasks_once(processing_delay_seconds=0)
+    assert processed_count == 1
+
+    conn = sqlite3.connect(db_file)
+    status = conn.execute("SELECT status FROM tasks WHERE id = 1").fetchone()[0]
+    conn.close()
+    assert status == "failed"
+
+
+def test_process_pending_tasks_marks_failed_by_failure_rate(tmp_path, monkeypatch):
+    db_file = tmp_path / "worker_tasks_fail_rate.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+    monkeypatch.delenv("POSTGRES_PASSWORD_FILE", raising=False)
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    monkeypatch.setenv("WORKER_FAILURE_RATE", "1")
+
+    conn = sqlite3.connect(db_file)
+    conn.execute(
+        "CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, status TEXT NOT NULL, updated_at TEXT)"
+    )
+    conn.execute("INSERT INTO tasks (title, status) VALUES ('normal task', 'pending')")
+    conn.commit()
+    conn.close()
+
+    processed_count = worker_main.process_pending_tasks_once(processing_delay_seconds=0)
+    assert processed_count == 1
+
+    conn = sqlite3.connect(db_file)
+    status = conn.execute("SELECT status FROM tasks WHERE id = 1").fetchone()[0]
+    conn.close()
+    assert status == "failed"
+
+
 def test_run_worker_loop_with_single_iteration(monkeypatch):
-    monkeypatch.setattr(worker_main, "process_pending_tasks_once", lambda: 0)
+    monkeypatch.setattr(worker_main, "process_pending_tasks_once", lambda limit=10: 0)
     worker_main.run_worker_loop(sleep_seconds=0, iterations=1)
