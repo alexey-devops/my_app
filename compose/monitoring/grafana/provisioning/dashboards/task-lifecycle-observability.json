@@ -83,15 +83,16 @@
       "type": "timeseries"
     },
     {
-      "datasource": "Loki",
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
       "gridPos": {"h": 7, "w": 12, "x": 12, "y": 12},
       "id": 8,
-      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
-        {"expr": "{container=\"worker\"} |= \"task_transition\"", "refId": "A"}
+        {"expr": "sum by (from_status,to_status,result)(increase(task_lifecycle_transitions_total[5m]))", "legendFormat": "{{from_status}} -> {{to_status}} ({{result}})", "refId": "A"}
       ],
-      "title": "Worker Lifecycle Logs (Loki)",
-      "type": "logs"
+      "title": "Worker Lifecycle Events (Last 5m)",
+      "type": "timeseries"
     }
   ],
   "refresh": "5s",
