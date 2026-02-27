@@ -9,75 +9,56 @@ on:
       - main
 
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r api/requirements.txt
+          pip install -r worker/requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: pytest api/tests worker/tests
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v3
 
       - name: Build API image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: ./api
-          push: false # Set to true to push to a registry
+          push: false
           tags: myapp-api:latest
 
       - name: Build Worker image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: ./worker
           push: false
           tags: myapp-worker:latest
 
       - name: Build Frontend image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: false
           tags: myapp-frontend:latest
-
-      - name: Run tests (Placeholder)
-        run: |
-          echo "Running unit and integration tests..."
-          # Example for Python services:
-          # docker run myapp-api:latest pytest
-          # docker run myapp-worker:latest pytest
-          echo "Tests passed!"
-
-      # - name: Scan vulnerabilities (Optional)
-      #   run: |
-      #     echo "Scanning Docker images for vulnerabilities..."
-      #     # Example using Trivy:
-      #     # docker run --rm -v ~/.cache:/root/.cache aquasec/trivy myapp-api:latest
-      #     # docker run --rm -v ~/.cache:/root/.cache aquasec/trivy myapp-worker:latest
-      #     # docker run --rm -v ~/.cache:/root/.cache aquasec/trivy myapp-frontend:latest
-      #     echo "Vulnerability scan completed."
-
-      # - name: Log in to Private Docker Registry (Example)
-      #   # This step would be needed if you were pushing to a remote or a locally accessible registry
-      #   # In this demo setup, the registry is part of docker-compose, not directly accessible from GitHub Actions runner
-      #   run: |
-      #     echo "Logging in to private registry..."
-      #     # docker login your-registry-url -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }}
-
-      # - name: Push images to Private Docker Registry (Example)
-      #   run: |
-      #     echo "Pushing images to private registry..."
-      #     # docker tag myapp-api:latest localhost:5000/myapp-api:latest
-      #     # docker push localhost:5000/myapp-api:latest
-      #     # docker tag myapp-worker:latest localhost:5000/myapp-worker:latest
-      #     # docker push localhost:5000/myapp-worker:latest
-      #     # docker tag myapp-frontend:latest localhost:5000/myapp-frontend:latest
-      #     # docker push localhost:5000/myapp-frontend:latest
-
-      # - name: Deploy (Placeholder)
-      #   run: |
-      #     echo "Deploying services on target server..."
-      #     # This would typically involve SSHing to the server and running docker-compose pull/up
-      #     # Example:
-      #     # ssh user@your-server "cd /path/to/app && docker-compose pull && docker-compose up -d"
-      #     echo "Deployment completed."

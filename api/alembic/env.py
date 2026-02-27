@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import os
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -33,13 +34,17 @@ def get_db_url():
     port = os.environ.get("POSTGRES_PORT", "5432")
 
     # Read password from secret file if available, otherwise from environment variable
-    password = None
     password_file = "/run/secrets/postgres_password"
     if os.path.exists(password_file):
         with open(password_file, "r") as f:
             password = f.read().strip()
     else:
-        password = os.environ.get("POSTGRES_PASSWORD", "password") # Fallback for local dev without secrets
+        password = os.environ.get("POSTGRES_PASSWORD")
+
+    if not password:
+        raise RuntimeError(
+            "PostgreSQL password is not configured. Set POSTGRES_PASSWORD or mount docker secret."
+        )
 
     return f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
 
@@ -74,6 +79,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    config.set_main_option("sqlalchemy.url", get_db_url())
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

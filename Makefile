@@ -18,8 +18,8 @@ down:
 	docker-compose -f docker-compose.yml --env-file $(ENV_FILE) down -v
 
 test:
-	@echo "Running tests (placeholder)..."
-	# Add your test commands here
+	@echo "Running Python tests..."
+	python3 -m pytest api/tests worker/tests
 
 clean:
 	@echo "Cleaning up Docker resources..."
