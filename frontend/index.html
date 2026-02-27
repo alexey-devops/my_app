@@ -429,6 +429,7 @@
     const kpiFailed = document.getElementById("kpiFailed");
 
     let allTasksCache = [];
+    let autoRefreshHandle = null;
 
     function showToast(message) {
       toast.textContent = message;
@@ -588,8 +589,18 @@
       if (event.key === "Enter") createTask();
     });
 
+    function startAutoRefresh() {
+      if (autoRefreshHandle) clearInterval(autoRefreshHandle);
+      autoRefreshHandle = setInterval(() => {
+        if (document.visibilityState === "visible") {
+          renderTasks();
+        }
+      }, 2000);
+    }
+
     checkHealth();
     renderTasks();
+    startAutoRefresh();
     setInterval(checkHealth, 10000);
   </script>
 </body>
