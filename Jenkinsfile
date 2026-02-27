@@ -3,7 +3,6 @@ pipeline {
 
   options {
     timestamps()
-    ansiColor('xterm')
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '30'))
   }
@@ -33,7 +32,7 @@ pipeline {
           python3 -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
-          pip install -r api/requirements.txt -r worker/requirements.txt pytest
+          pip install -r api/requirements.txt -r worker/requirements.txt pytest pytest-cov
 
           mkdir -p secrets certs reports
           printf 'dummy-password' > secrets/postgres_password.txt
@@ -53,12 +52,16 @@ pipeline {
       }
     }
 
-    stage('Unit Tests') {
+    stage('Autotests') {
       steps {
         sh '''
           set -euxo pipefail
           . .venv/bin/activate
-          pytest -q api/tests worker/tests --junitxml=reports/pytest.xml
+          pytest -q api/tests worker/tests \
+            --junitxml=reports/pytest.xml \
+            --cov=api --cov=worker \
+            --cov-report=term \
+            --cov-report=xml:reports/coverage.xml
         '''
       }
       post {
@@ -81,7 +84,7 @@ pipeline {
   post {
     always {
       archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
-      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true)
+      deleteDir()
     }
   }
 }

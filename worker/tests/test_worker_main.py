@@ -143,3 +143,56 @@ def test_process_pending_tasks_marks_failed_by_failure_rate(tmp_path, monkeypatc
 def test_run_worker_loop_with_single_iteration(monkeypatch):
     monkeypatch.setattr(worker_main, "process_pending_tasks_once", lambda limit=10: 0)
     worker_main.run_worker_loop(sleep_seconds=0, iterations=1)
+
+
+def test_should_fail_task_by_marker_case_insensitive(monkeypatch):
+    monkeypatch.setenv("WORKER_FAILURE_RATE", "0")
+    assert worker_main.should_fail_task("[FaIl] demo task") is True
+
+
+def test_should_fail_task_by_failure_rate_threshold(monkeypatch):
+    monkeypatch.setenv("WORKER_FAILURE_RATE", "0.5")
+    monkeypatch.setattr(worker_main.random, "random", lambda: 0.4)
+    assert worker_main.should_fail_task("normal task") is True
+
+    monkeypatch.setattr(worker_main.random, "random", lambda: 0.6)
+    assert worker_main.should_fail_task("normal task") is False
+
+
+def test_process_pending_tasks_once_respects_limit(tmp_path, monkeypatch):
+    db_file = tmp_path / "worker_tasks_limit.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+    monkeypatch.delenv("POSTGRES_PASSWORD_FILE", raising=False)
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    monkeypatch.setenv("WORKER_FAILURE_RATE", "0")
+
+    conn = sqlite3.connect(db_file)
+    conn.execute(
+        "CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, status TEXT NOT NULL, updated_at TEXT)"
+    )
+    conn.execute("INSERT INTO tasks (title, status) VALUES ('task 1', 'pending')")
+    conn.execute("INSERT INTO tasks (title, status) VALUES ('task 2', 'pending')")
+    conn.execute("INSERT INTO tasks (title, status) VALUES ('task 3', 'pending')")
+    conn.commit()
+    conn.close()
+
+    processed_count = worker_main.process_pending_tasks_once(
+        limit=2, processing_delay_seconds=0
+    )
+    assert processed_count == 2
+
+    conn = sqlite3.connect(db_file)
+    statuses = conn.execute("SELECT status FROM tasks ORDER BY id").fetchall()
+    conn.close()
+    assert statuses.count(("done",)) == 2
+    assert statuses.count(("pending",)) == 1
+
+
+def test_process_pending_tasks_once_returns_zero_on_sql_error(tmp_path, monkeypatch):
+    db_file = tmp_path / "worker_tasks_no_table.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+    monkeypatch.delenv("POSTGRES_PASSWORD_FILE", raising=False)
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+
+    processed_count = worker_main.process_pending_tasks_once(processing_delay_seconds=0)
+    assert processed_count == 0

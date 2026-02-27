@@ -11,6 +11,7 @@ docker compose -f docker-compose.jenkins.yml up -d --build
 - URL: `http://localhost:8081`
 - Login: `admin`
 - Password: `admin123`
+- Blue Ocean UI (after plugin install): `http://localhost:8081/blue`
 
 ## Stop
 
@@ -33,3 +34,11 @@ docker compose -f docker-compose.jenkins.yml down
 In GitHub repository settings add webhook:
 - `http://<your-host>:8081/github-webhook/`
 - event: `push`
+
+## What pipeline does
+
+- validates `docker-compose.yml`
+- runs autotests `pytest api/tests worker/tests`
+- publishes JUnit report (`reports/pytest.xml`)
+- generates coverage report (`reports/coverage.xml`)
+- builds Docker images (`api`, `worker`, `frontend`)

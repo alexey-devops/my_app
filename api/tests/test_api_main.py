@@ -167,3 +167,44 @@ def test_list_tasks_rejects_invalid_status_filter(tmp_path, monkeypatch):
         response = client.get("/tasks", params={"status": "unknown"})
 
     assert response.status_code == 422
+
+
+def test_get_task_returns_404_for_unknown_id(tmp_path, monkeypatch):
+    db_file = tmp_path / "tasks_get_404.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+
+    with TestClient(api_main.app) as client:
+        response = client.get("/tasks/999")
+
+    assert response.status_code == 404
+
+
+def test_update_task_status_rejects_invalid_status(tmp_path, monkeypatch):
+    db_file = tmp_path / "tasks_invalid_status.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+
+    with TestClient(api_main.app) as client:
+        created = client.post("/tasks", json={"title": "Task for invalid status"}).json()
+        response = client.patch(
+            f"/tasks/{created['id']}/status", json={"status": "unknown"}
+        )
+
+    assert response.status_code == 422
+
+
+def test_list_tasks_respects_offset(tmp_path, monkeypatch):
+    db_file = tmp_path / "tasks_offset.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+
+    with TestClient(api_main.app) as client:
+        first = client.post("/tasks", json={"title": "First"}).json()
+        second = client.post("/tasks", json={"title": "Second"}).json()
+        third = client.post("/tasks", json={"title": "Third"}).json()
+
+        response = client.get("/tasks", params={"limit": 1, "offset": 1})
+        assert response.status_code == 200
+        tasks = response.json()
+        assert len(tasks) == 1
+        assert tasks[0]["id"] == second["id"]
+        assert tasks[0]["id"] != third["id"]
+        assert tasks[0]["id"] != first["id"]
