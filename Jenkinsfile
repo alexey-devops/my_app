@@ -29,6 +29,7 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
+          cp .env.example .env
           mkdir -p secrets certs reports
           printf 'dummy-password' > secrets/postgres_password.txt
           printf 'dummy-password' > secrets/grafana_admin_password.txt
