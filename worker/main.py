@@ -1,4 +1,5 @@
 import os
+import random
 import time
 from functools import lru_cache
 from typing import Optional
@@ -65,6 +66,18 @@ def mask_database_url(db_url: str) -> str:
     return db_url
 
 
+def should_fail_task(task_title: str) -> bool:
+    # Deterministic way to demonstrate failure path in demos.
+    if "[fail]" in task_title.lower():
+        return True
+
+    # Optional probabilistic failures to emulate flaky external systems.
+    failure_rate = float(os.environ.get("WORKER_FAILURE_RATE", "0"))
+    if failure_rate <= 0:
+        return False
+    return random.random() < failure_rate
+
+
 def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Optional[float] = None) -> int:
     if processing_delay_seconds is None:
         processing_delay_seconds = float(os.environ.get("WORKER_PROCESSING_DELAY_SECONDS", "3"))
@@ -101,6 +114,8 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
             time.sleep(processing_delay_seconds)
 
             try:
+                if should_fail_task(row.title):
+                    raise RuntimeError("Task marked to fail")
                 with get_engine().begin() as conn:
                     updated = conn.execute(query_mark_done, {"task_id": row.id})
                     if updated.rowcount != 1:
@@ -108,8 +123,6 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
             except Exception:
                 with get_engine().begin() as conn:
                     conn.execute(query_mark_failed, {"task_id": row.id})
-                continue
-
             processed_count += 1
         return processed_count
     except SQLAlchemyError as exc:
