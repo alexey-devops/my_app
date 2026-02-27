@@ -212,7 +212,7 @@ services:
     container_name: nginx_exporter
     restart: unless-stopped
     command:
-      - -nginx.scrape-uri=http://nginx/nginx_status
+      - -nginx.scrape-uri=http://nginx:8080/nginx_status
     ports:
       - "127.0.0.1:9113:9113"
     networks:
