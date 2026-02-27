@@ -33,3 +33,11 @@ docker compose -f docker-compose.jenkins.yml down
 In GitHub repository settings add webhook:
 - `http://<your-host>:8081/github-webhook/`
 - event: `push`
+
+## What pipeline does
+
+- validates `docker-compose.yml`
+- runs autotests `pytest api/tests worker/tests`
+- publishes JUnit report (`reports/pytest.xml`)
+- generates coverage report (`reports/coverage.xml`)
+- builds Docker images (`api`, `worker`, `frontend`)
