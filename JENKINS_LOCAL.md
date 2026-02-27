@@ -11,6 +11,7 @@ docker compose -f docker-compose.jenkins.yml up -d --build
 - URL: `http://localhost:8081`
 - Login: `admin`
 - Password: `admin123`
+- Blue Ocean UI (after plugin install): `http://localhost:8081/blue`
 
 ## Stop
 

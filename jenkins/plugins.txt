@@ -1,4 +1,7 @@
 workflow-aggregator
+pipeline-stage-view
+blueocean
+dashboard-view
 git
 github
 github-branch-source
