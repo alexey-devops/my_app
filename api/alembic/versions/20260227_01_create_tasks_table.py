@@ -23,6 +23,10 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=50), nullable=False, server_default="pending"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.CheckConstraint(
+            "status IN ('pending', 'in_progress', 'done', 'failed')",
+            name="ck_tasks_status_valid",
+        ),
     )
     op.create_index("ix_tasks_id", "tasks", ["id"], unique=False)
 

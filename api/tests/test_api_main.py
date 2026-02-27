@@ -157,3 +157,13 @@ def test_update_task_status_returns_404_for_unknown_id(tmp_path, monkeypatch):
         response = client.patch("/tasks/999/status", json={"status": "done"})
 
     assert response.status_code == 404
+
+
+def test_list_tasks_rejects_invalid_status_filter(tmp_path, monkeypatch):
+    db_file = tmp_path / "tasks_invalid_filter.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+
+    with TestClient(api_main.app) as client:
+        response = client.get("/tasks", params={"status": "unknown"})
+
+    assert response.status_code == 422

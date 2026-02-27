@@ -1,55 +1,404 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Frontend Application</title>
+    <title>Task Hub | Demo Project</title>
     <style>
+        :root {
+            --bg-top: #0f172a;
+            --bg-bottom: #1e293b;
+            --card: rgba(248, 250, 252, 0.92);
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --accent: #0ea5e9;
+            --accent-dark: #0369a1;
+            --ok: #16a34a;
+            --warn: #ea580c;
+            --danger: #dc2626;
+            --pending: #6366f1;
+            --border: rgba(15, 23, 42, 0.14);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
-            color: #333;
+            min-height: 100vh;
+            font-family: "Poppins", "Trebuchet MS", sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(circle at 20% 15%, rgba(14, 165, 233, 0.25), transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(56, 189, 248, 0.22), transparent 42%),
+                linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
+            padding: 32px 16px;
         }
-        .container {
-            text-align: center;
-            padding: 2em;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+
+        .app {
+            width: min(980px, 100%);
+            margin: 0 auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            box-shadow: 0 28px 56px rgba(2, 6, 23, 0.32);
+            overflow: hidden;
+            animation: appear 420ms ease-out;
         }
-        h1 {
-            color: #007bff;
+
+        .head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 24px;
+            background: linear-gradient(135deg, #e2e8f0, #f8fafc);
+            border-bottom: 1px solid var(--border);
         }
-        p {
-            font-size: 1.2em;
+
+        .head h1 {
+            margin: 0;
+            font-size: clamp(1.4rem, 2vw, 1.9rem);
+            letter-spacing: 0.01em;
+        }
+
+        .api-state {
+            font-size: 0.92rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: #94a3b8;
+        }
+
+        .dot.ok { background: var(--ok); }
+        .dot.err { background: var(--danger); }
+
+        .content {
+            padding: 20px 24px 24px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .panel {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            background: #fff;
+        }
+
+        .panel h2 {
+            margin: 0 0 12px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"], select {
+            font: inherit;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-height: 42px;
+            background: #fff;
+            color: var(--text-main);
+        }
+
+        input[type="text"] {
+            flex: 1 1 240px;
+        }
+
+        button {
+            font: inherit;
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 14px;
+            min-height: 42px;
+            color: #fff;
+            background: var(--accent);
+            cursor: pointer;
+            transition: transform 120ms ease, background 120ms ease;
+        }
+
+        button:hover { background: var(--accent-dark); }
+        button:active { transform: translateY(1px); }
+
+        .ghost {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .ghost:hover {
+            background: #cbd5e1;
+        }
+
+        .tasks {
+            display: grid;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .task {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            display: grid;
+            gap: 10px;
+            background: #f8fafc;
+            animation: slide 240ms ease-out;
+        }
+
+        .task-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .task-title {
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 999px;
+            color: #fff;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .pending { background: var(--pending); }
+        .in_progress { background: var(--warn); }
+        .done { background: var(--ok); }
+        .failed { background: var(--danger); }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .task-actions button {
+            min-height: 34px;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+        }
+
+        .muted {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        @keyframes appear {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slide {
+            from { opacity: 0; transform: translateX(-8px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @media (max-width: 720px) {
+            .head { padding: 18px; }
+            .content { padding: 14px; }
+            .panel { padding: 12px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Welcome to the Frontend!</h1>
-        <p>This is a placeholder for your awesome application.</p>
-        <p>API status: <span id="apiStatus">Loading...</span></p>
-    </div>
+    <main class="app">
+        <header class="head">
+            <h1>Task Hub</h1>
+            <div class="api-state" id="apiState">
+                <span class="dot" id="apiDot"></span>
+                <span id="apiText">Проверка API...</span>
+            </div>
+        </header>
+
+        <section class="content">
+            <div class="panel">
+                <h2>Новая задача</h2>
+                <div class="row">
+                    <input id="taskInput" type="text" maxlength="255" placeholder="Например: Подготовить демо для собеседования">
+                    <button id="createBtn">Добавить</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Список задач</h2>
+                <div class="row">
+                    <select id="statusFilter">
+                        <option value="">Все статусы</option>
+                        <option value="pending">pending</option>
+                        <option value="in_progress">in_progress</option>
+                        <option value="done">done</option>
+                        <option value="failed">failed</option>
+                    </select>
+                    <button class="ghost" id="refreshBtn">Обновить</button>
+                </div>
+                <p class="muted" id="summary">Загрузка...</p>
+                <div class="tasks" id="tasks"></div>
+            </div>
+        </section>
+    </main>
 
     <script>
-        // Basic script to check API status (example)
-        fetch('/api/health')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('apiStatus').innerText = data.status === 'ok' ? 'Online' : 'Offline';
-                document.getElementById('apiStatus').style.color = data.status === 'ok' ? 'green' : 'red';
-            })
-            .catch(error => {
-                document.getElementById('apiStatus').innerText = 'Error fetching API status';
-                document.getElementById('apiStatus').style.color = 'red';
-                console.error('Error:', error);
+        const apiText = document.getElementById("apiText");
+        const apiDot = document.getElementById("apiDot");
+        const taskInput = document.getElementById("taskInput");
+        const createBtn = document.getElementById("createBtn");
+        const refreshBtn = document.getElementById("refreshBtn");
+        const statusFilter = document.getElementById("statusFilter");
+        const tasksRoot = document.getElementById("tasks");
+        const summary = document.getElementById("summary");
+
+        async function checkHealth() {
+            try {
+                const response = await fetch("/api/health");
+                if (!response.ok) throw new Error("bad status");
+                const data = await response.json();
+                if (data.status === "ok") {
+                    apiDot.className = "dot ok";
+                    apiText.textContent = "API онлайн";
+                    return;
+                }
+                throw new Error("unexpected payload");
+            } catch {
+                apiDot.className = "dot err";
+                apiText.textContent = "API недоступен";
+            }
+        }
+
+        function taskTemplate(task) {
+            const card = document.createElement("article");
+            card.className = "task";
+
+            const head = document.createElement("div");
+            head.className = "task-head";
+
+            const title = document.createElement("div");
+            title.className = "task-title";
+            title.textContent = `#${task.id} ${task.title}`;
+
+            const badge = document.createElement("span");
+            badge.className = `badge ${task.status}`;
+            badge.textContent = task.status;
+
+            head.appendChild(title);
+            head.appendChild(badge);
+            card.appendChild(head);
+
+            const actions = document.createElement("div");
+            actions.className = "task-actions";
+
+            ["pending", "in_progress", "done", "failed"].forEach((status) => {
+                const btn = document.createElement("button");
+                btn.className = "ghost";
+                btn.textContent = status;
+                btn.disabled = status === task.status;
+                btn.addEventListener("click", async () => {
+                    await updateTaskStatus(task.id, status);
+                });
+                actions.appendChild(btn);
             });
+
+            card.appendChild(actions);
+            return card;
+        }
+
+        async function fetchTasks() {
+            const selected = statusFilter.value;
+            const url = selected ? `/api/tasks?status=${encodeURIComponent(selected)}` : "/api/tasks";
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Cannot fetch tasks: ${response.status}`);
+            }
+            return response.json();
+        }
+
+        async function renderTasks() {
+            try {
+                const tasks = await fetchTasks();
+                tasksRoot.innerHTML = "";
+
+                if (tasks.length === 0) {
+                    summary.textContent = "Задач пока нет.";
+                    return;
+                }
+
+                summary.textContent = `Всего задач: ${tasks.length}`;
+                tasks.forEach((task) => {
+                    tasksRoot.appendChild(taskTemplate(task));
+                });
+            } catch {
+                summary.textContent = "Не удалось получить список задач.";
+                tasksRoot.innerHTML = "";
+            }
+        }
+
+        async function createTask() {
+            const title = taskInput.value.trim();
+            if (!title) return;
+
+            createBtn.disabled = true;
+            try {
+                const response = await fetch("/api/tasks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title }),
+                });
+                if (!response.ok) throw new Error("create failed");
+
+                taskInput.value = "";
+                await renderTasks();
+            } catch {
+                alert("Не удалось создать задачу");
+            } finally {
+                createBtn.disabled = false;
+            }
+        }
+
+        async function updateTaskStatus(taskId, status) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}/status`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status }),
+                });
+                if (!response.ok) throw new Error("patch failed");
+                await renderTasks();
+            } catch {
+                alert("Не удалось обновить статус");
+            }
+        }
+
+        createBtn.addEventListener("click", createTask);
+        refreshBtn.addEventListener("click", renderTasks);
+        statusFilter.addEventListener("change", renderTasks);
+        taskInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") createTask();
+        });
+
+        checkHealth();
+        renderTasks();
     </script>
 </body>
 </html>

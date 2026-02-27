@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, func
+from sqlalchemy import CheckConstraint, Column, DateTime, Integer, String, func
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -13,6 +13,12 @@ class TaskStatus:
 
 class Task(Base):
     __tablename__ = "tasks"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'in_progress', 'done', 'failed')",
+            name="ck_tasks_status_valid",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
