@@ -429,6 +429,7 @@
     const kpiFailed = document.getElementById("kpiFailed");
 
     let allTasksCache = [];
+    let lastRenderSignature = "";
     let autoRefreshHandle = null;
 
     function showToast(message) {
@@ -483,7 +484,7 @@
     async function retryTask(taskId) {
       await updateTaskStatus(taskId, "pending");
       showToast(`Task #${taskId} moved to pending`);
-      await renderTasks();
+      await renderTasks({ force: true });
     }
 
     function createStatusButton(label, nextStatus, currentStatus, taskId) {
@@ -495,7 +496,7 @@
         try {
           await updateTaskStatus(taskId, nextStatus);
           showToast(`Task #${taskId} status updated`);
-          await renderTasks();
+          await renderTasks({ force: true });
         } catch {
           showToast("Failed to update task status");
         }
@@ -503,9 +504,12 @@
       return btn;
     }
 
-    function taskCard(task) {
+    function taskCard(task, animate = true) {
       const card = document.createElement("article");
       card.className = "task";
+      if (!animate) {
+        card.style.animation = "none";
+      }
 
       const head = document.createElement("div");
       head.className = "task-head";
@@ -541,19 +545,34 @@
       return card;
     }
 
-    async function renderTasks() {
-      try {
-        allTasksCache = await fetchTasks(statusFilter.value);
-        tasksRoot.innerHTML = "";
-        updateKPIs(allTasksCache);
+    function getTasksSignature(tasks) {
+      return JSON.stringify(
+        tasks.map(task => ({ id: task.id, status: task.status, title: task.title }))
+      );
+    }
 
-        if (allTasksCache.length === 0) {
+    async function renderTasks(options = {}) {
+      const { force = false, silent = false } = options;
+      try {
+        const freshTasks = await fetchTasks(statusFilter.value);
+        const freshSignature = getTasksSignature(freshTasks);
+
+        if (!force && freshSignature === lastRenderSignature) {
+          return;
+        }
+
+        allTasksCache = freshTasks;
+        lastRenderSignature = freshSignature;
+        tasksRoot.innerHTML = "";
+        updateKPIs(freshTasks);
+
+        if (freshTasks.length === 0) {
           summary.textContent = "No tasks found for selected filter.";
           return;
         }
 
-        summary.textContent = `Showing ${allTasksCache.length} task(s)`;
-        allTasksCache.forEach(task => tasksRoot.appendChild(taskCard(task)));
+        summary.textContent = `Showing ${freshTasks.length} task(s)`;
+        freshTasks.forEach(task => tasksRoot.appendChild(taskCard(task, !silent)));
       } catch {
         summary.textContent = "Failed to load tasks.";
         tasksRoot.innerHTML = "";
@@ -574,7 +593,7 @@
         if (!response.ok) throw new Error(`create failed: ${response.status}`);
         taskInput.value = "";
         showToast("Task created");
-        await renderTasks();
+        await renderTasks({ force: true });
       } catch {
         showToast("Failed to create task");
       } finally {
@@ -583,8 +602,11 @@
     }
 
     createBtn.addEventListener("click", createTask);
-    refreshBtn.addEventListener("click", renderTasks);
-    statusFilter.addEventListener("change", renderTasks);
+    refreshBtn.addEventListener("click", () => renderTasks({ force: true }));
+    statusFilter.addEventListener("change", () => {
+      lastRenderSignature = "";
+      renderTasks({ force: true });
+    });
     taskInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") createTask();
     });
@@ -593,13 +615,13 @@
       if (autoRefreshHandle) clearInterval(autoRefreshHandle);
       autoRefreshHandle = setInterval(() => {
         if (document.visibilityState === "visible") {
-          renderTasks();
+          renderTasks({ silent: true });
         }
       }, 2000);
     }
 
     checkHealth();
-    renderTasks();
+    renderTasks({ force: true });
     startAutoRefresh();
     setInterval(checkHealth, 10000);
   </script>
