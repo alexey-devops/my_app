@@ -30,12 +30,12 @@
 - PostgreSQL, Redis
 - Nginx
 - Docker / Docker Compose
-- GitHub Actions
+- Jenkins
 
 ## DevOps-фокус
 
 - CI/CD pipeline для тестов, сборки и quality gates
-- Security scanning (Trivy + SARIF в GitHub Security)
+- Централизованный CI в Jenkins (без запуска GitHub Actions)
 - Linting инфраструктурных артефактов (YAML, Dockerfile)
 - Dependabot для обновлений зависимостей
 - Release workflow для публикации образов в GHCR
@@ -90,6 +90,15 @@ make db-revision MESSAGE="описание"
 ```bash
 make test
 ```
+
+## CI через Jenkins
+
+- Основной pipeline: `Jenkinsfile` в корне репозитория
+- Рекомендованный тип job: `Pipeline script from SCM` (GitHub webhook -> Jenkins)
+- Статусы и логи проверок смотреть в Jenkins build:
+  - `Validate Compose`
+  - `Unit Tests`
+  - `Build Docker Images`
 
 ## Структура
 

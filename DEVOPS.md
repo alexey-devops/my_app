@@ -4,31 +4,24 @@
 
 ## CI/CD
 
-### Workflows
+### Jenkins Pipeline
 
-- `.github/workflows/ci-cd.yml`
-  - Python тесты (`pytest`)
-  - Сборка Docker-образов API/Worker/Frontend
+- `Jenkinsfile` (корень репозитория)
+  - `Checkout`
+  - `Prepare CI Environment` (venv + deps + test fixtures)
+  - `Validate Compose`
+  - `Unit Tests` (`pytest` + JUnit report)
+  - `Build Docker Images` (api/worker/frontend)
 
-- `.github/workflows/devops-quality.yml`
-  - Валидация `docker-compose.yml`
-  - `yamllint` для YAML
-  - `hadolint` для Dockerfile
-  - `Trivy` FS scan с загрузкой SARIF в Security tab GitHub
+### GitHub role
 
-- `.github/workflows/release-images.yml`
-  - Release-пайплайн по тегам `v*.*.*`
-  - Публикация образов в GHCR:
-    - `ghcr.io/<owner>/my-app-api`
-    - `ghcr.io/<owner>/my-app-worker`
-    - `ghcr.io/<owner>/my-app-frontend`
+- GitHub используется как source-of-truth для репозитория.
+- Автозапуск CI через GitHub Actions отключён:
+  - workflow-файлы перенесены в `.github/workflows-disabled/`
 
 ## Dependency Management
 
-- `.github/dependabot.yml`
-  - автоматические weekly-обновления:
-    - GitHub Actions
-    - Python dependencies (`api`, `worker`)
+- Зависимости ревьюятся и обновляются через обычный git-flow с прогоном Jenkins pipeline.
 
 ## Quality Gates
 
@@ -62,8 +55,7 @@
 
 ## Release Flow (recommended)
 
-1. Merge в `main`
-2. Создать тег версии:
-   - `git tag v1.0.0`
-   - `git push origin v1.0.0`
-3. GitHub Actions автоматически соберёт и опубликует образы в GHCR
+1. Push в feature-ветку.
+2. Jenkins запускает pipeline по webhook.
+3. После зелёного pipeline — merge в `main`.
+4. Jenkins release job (отдельная) собирает и публикует образы в registry.
