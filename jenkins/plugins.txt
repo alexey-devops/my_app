@@ -1,14 +1,10 @@
 workflow-aggregator
 pipeline-stage-view
 blueocean
-dashboard-view
 git
 github
 github-branch-source
 pipeline-github
 credentials-binding
 junit
-ws-cleanup
-ansicolor
 timestamper
-matrix-auth

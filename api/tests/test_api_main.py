@@ -86,6 +86,20 @@ def test_health_endpoint(tmp_path, monkeypatch):
     assert response.json() == {"status": "ok"}
 
 
+def test_root_endpoint_does_not_expose_database_url(tmp_path, monkeypatch):
+    db_file = tmp_path / "root.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+
+    with TestClient(api_main.app) as client:
+        response = client.get("/")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["service"] == "tasks-api"
+    assert payload["status"] == "ok"
+    assert "database" not in response.text.lower()
+
+
 def test_create_and_list_tasks(tmp_path, monkeypatch):
     db_file = tmp_path / "tasks.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
@@ -145,6 +159,17 @@ def test_create_task_rejects_blank_title(tmp_path, monkeypatch):
 
     with TestClient(api_main.app) as client:
         response = client.post("/tasks", json={"title": "   "})
+
+    assert response.status_code == 422
+
+
+def test_create_task_rejects_too_long_title(tmp_path, monkeypatch):
+    db_file = tmp_path / "tasks_invalid_long.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+    long_title = "x" * 256
+
+    with TestClient(api_main.app) as client:
+        response = client.post("/tasks", json={"title": long_title})
 
     assert response.status_code == 422
 

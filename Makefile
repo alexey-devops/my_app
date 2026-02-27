@@ -2,28 +2,29 @@
 
 # Default to .env if not specified
 ENV_FILE ?= .env
+DOCKER_COMPOSE ?= docker compose
 
 all: up
 
 build:
 	@echo "Building Docker images..."
-	docker-compose -f docker-compose.yml build
+	$(DOCKER_COMPOSE) -f docker-compose.yml build
 
 up:
 	@echo "Bringing up Docker Compose stack..."
-	docker-compose -f docker-compose.yml --env-file $(ENV_FILE) up -d --remove-orphans
+	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) up -d --remove-orphans
 
 down:
 	@echo "Bringing down Docker Compose stack..."
-	docker-compose -f docker-compose.yml --env-file $(ENV_FILE) down -v
+	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) down -v
 
 test:
-	@echo "Running Python tests..."
-	python3 -m pytest api/tests worker/tests
+	@echo "Running Python tests in isolated Python 3.10 container..."
+	docker run --rm -v "$(PWD):/work:ro" -w /work python:3.10-slim bash -lc "python -m pip install --upgrade pip >/dev/null && pip install -q -r api/requirements.txt -r worker/requirements.txt pytest && pytest -q -o cache_dir=/tmp/pytest-cache api/tests worker/tests"
 
 clean:
 	@echo "Cleaning up Docker resources..."
-	docker-compose -f docker-compose.yml down -v --rmi all
+	$(DOCKER_COMPOSE) -f docker-compose.yml down -v --rmi all
 	docker volume prune -f
 	docker network prune -f
 	@echo "Docker resources cleaned."
@@ -33,31 +34,31 @@ DB_MIGRATE_CONTAINER := api
 
 db-migrate-head:
 	@echo "Applying all pending Alembic migrations..."
-	docker-compose -f docker-compose.yml --env-file $(ENV_FILE) exec $(DB_MIGRATE_CONTAINER) alembic upgrade head
+	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) exec $(DB_MIGRATE_CONTAINER) alembic upgrade head
 
 db-revision: MESSAGE ?= "Empty migration"
 db-revision:
 	@echo "Creating new Alembic migration: $(MESSAGE)..."
-	docker-compose -f docker-compose.yml --env-file $(ENV_FILE) exec $(DB_MIGRATE_CONTAINER) alembic revision -m "$(MESSAGE)"
+	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) exec $(DB_MIGRATE_CONTAINER) alembic revision -m "$(MESSAGE)"
 
 db-upgrade: REVISION := head
 db-upgrade:
 	@echo "Upgrading database to revision $(REVISION)..."
-	docker-compose -f docker-compose.yml --env-file $(ENV_FILE) exec $(DB_MIGRATE_CONTAINER) alembic upgrade $(REVISION)
+	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) exec $(DB_MIGRATE_CONTAINER) alembic upgrade $(REVISION)
 
 db-downgrade: REVISION := -1
 db-downgrade:
 	@echo "Downgrading database to revision $(REVISION)..."
-	docker-compose -f docker-compose.yml --env-file $(ENV_FILE) exec $(DB_MIGRATE_CONTAINER) alembic downgrade $(REVISION)
+	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) exec $(DB_MIGRATE_CONTAINER) alembic downgrade $(REVISION)
 
 # Utility targets
 logs:
 	@echo "Showing Docker Compose logs..."
-	docker-compose -f docker-compose.yml logs -f
+	$(DOCKER_COMPOSE) -f docker-compose.yml logs -f
 
 ps:
 	@echo "Listing Docker Compose services..."
-	docker-compose -f docker-compose.yml ps
+	$(DOCKER_COMPOSE) -f docker-compose.yml ps
 
 compose-validate:
 	@echo "Validating Docker Compose configuration..."

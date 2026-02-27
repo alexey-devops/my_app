@@ -159,6 +159,24 @@ def test_should_fail_task_by_failure_rate_threshold(monkeypatch):
     assert worker_main.should_fail_task("normal task") is False
 
 
+def test_should_fail_task_with_invalid_failure_rate_falls_back_to_zero(monkeypatch):
+    monkeypatch.setenv("WORKER_FAILURE_RATE", "oops")
+    assert worker_main.should_fail_task("normal task") is False
+
+
+def test_run_worker_loop_with_invalid_batch_size_uses_default(monkeypatch):
+    monkeypatch.setenv("WORKER_BATCH_SIZE", "not-an-int")
+    received_limits = []
+
+    def fake_process(limit=10):
+        received_limits.append(limit)
+        return 0
+
+    monkeypatch.setattr(worker_main, "process_pending_tasks_once", fake_process)
+    worker_main.run_worker_loop(sleep_seconds=0, iterations=1)
+    assert received_limits == [10]
+
+
 def test_process_pending_tasks_once_respects_limit(tmp_path, monkeypatch):
     db_file = tmp_path / "worker_tasks_limit.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")

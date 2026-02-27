@@ -1,9 +1,13 @@
 extends: default
+ignore: |
+  .jenkins_home/
+  reports/
 
 rules:
   line-length:
     max: 160
     level: warning
+  document-start: disable
   truthy:
     allowed-values: ['true', 'false', 'on', 'off']
   comments-indentation: disable

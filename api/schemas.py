@@ -9,7 +9,7 @@ except ImportError:
 
 
 class TaskCreate(BaseModel):
-    title: constr(strip_whitespace=True, min_length=1)
+    title: constr(strip_whitespace=True, min_length=1, max_length=255)
 
 
 class TaskRead(BaseModel):

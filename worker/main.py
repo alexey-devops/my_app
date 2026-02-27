@@ -15,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 def _read_postgres_password() -> str:
     password_file_path = os.environ.get("POSTGRES_PASSWORD_FILE")
     if password_file_path and os.path.exists(password_file_path):
-        with open(password_file_path, "r") as f:
+        with open(password_file_path, "r", encoding="utf-8") as f:
             password = f.read().strip()
             if password:
                 return password
@@ -83,7 +83,74 @@ def log_event(event: str, **kwargs) -> None:
         "event": event,
     }
     payload.update(kwargs)
-    print(json.dumps(payload, ensure_ascii=True))
+    print(json.dumps(payload, ensure_ascii=True), flush=True)
+
+
+def _read_float_env(
+    name: str,
+    default: float,
+    min_value: float | None = None,
+    max_value: float | None = None,
+) -> float:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+
+    try:
+        parsed = float(raw_value)
+    except ValueError:
+        log_event(
+            "worker_invalid_env",
+            name=name,
+            raw_value=raw_value,
+            fallback=default,
+        )
+        return default
+
+    if min_value is not None and parsed < min_value:
+        log_event(
+            "worker_invalid_env",
+            name=name,
+            raw_value=raw_value,
+            fallback=default,
+        )
+        return default
+    if max_value is not None and parsed > max_value:
+        log_event(
+            "worker_invalid_env",
+            name=name,
+            raw_value=raw_value,
+            fallback=default,
+        )
+        return default
+    return parsed
+
+
+def _read_int_env(name: str, default: int, min_value: int = 1) -> int:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        log_event(
+            "worker_invalid_env",
+            name=name,
+            raw_value=raw_value,
+            fallback=default,
+        )
+        return default
+
+    if parsed < min_value:
+        log_event(
+            "worker_invalid_env",
+            name=name,
+            raw_value=raw_value,
+            fallback=default,
+        )
+        return default
+    return parsed
 
 
 def refresh_status_metrics() -> None:
@@ -119,15 +186,19 @@ def should_fail_task(task_title: str) -> bool:
         return True
 
     # Optional probabilistic failures to emulate flaky external systems.
-    failure_rate = float(os.environ.get("WORKER_FAILURE_RATE", "0"))
-    if failure_rate <= 0:
+    failure_rate = _read_float_env("WORKER_FAILURE_RATE", default=0.0, min_value=0.0, max_value=1.0)
+    if failure_rate == 0:
         return False
     return random.random() < failure_rate
 
 
 def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Optional[float] = None) -> int:
     if processing_delay_seconds is None:
-        processing_delay_seconds = float(os.environ.get("WORKER_PROCESSING_DELAY_SECONDS", "3"))
+        processing_delay_seconds = _read_float_env(
+            "WORKER_PROCESSING_DELAY_SECONDS",
+            default=3.0,
+            min_value=0.0,
+        )
 
     query_select = text(
         "SELECT id, title FROM tasks WHERE status = 'pending' ORDER BY id ASC LIMIT :limit"
@@ -137,10 +208,12 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
         "WHERE id = :task_id AND status = 'pending'"
     )
     query_mark_done = text(
-        "UPDATE tasks SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = :task_id"
+        "UPDATE tasks SET status = 'done', updated_at = CURRENT_TIMESTAMP "
+        "WHERE id = :task_id AND status = 'in_progress'"
     )
     query_mark_failed = text(
-        "UPDATE tasks SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = :task_id"
+        "UPDATE tasks SET status = 'failed', updated_at = CURRENT_TIMESTAMP "
+        "WHERE id = :task_id AND status = 'in_progress'"
     )
 
     try:
@@ -199,7 +272,9 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
                 )
             except Exception:
                 with get_engine().begin() as conn:
-                    conn.execute(query_mark_failed, {"task_id": row.id})
+                    updated = conn.execute(query_mark_failed, {"task_id": row.id})
+                    if updated.rowcount != 1:
+                        continue
                 TASK_TRANSITIONS_TOTAL.labels(
                     from_status="in_progress",
                     to_status="failed",
@@ -225,14 +300,14 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
 
 
 def run_worker_loop(sleep_seconds: int = 5, iterations: int | None = None) -> None:
-    batch_size = int(os.environ.get("WORKER_BATCH_SIZE", "10"))
+    batch_size = _read_int_env("WORKER_BATCH_SIZE", default=10, min_value=1)
     counter = 0
     while True:
         processed_count = process_pending_tasks_once(limit=batch_size)
         if processed_count == 0:
-            print("Worker is active, no pending tasks found.")
+            print("Worker is active, no pending tasks found.", flush=True)
         else:
-            print(f"Worker processed {processed_count} task(s).")
+            print(f"Worker processed {processed_count} task(s).", flush=True)
         if iterations is not None:
             counter += 1
             if counter >= iterations:

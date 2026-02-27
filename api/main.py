@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
-from fastapi.responses import HTMLResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
 from sqlalchemy.orm import Session
 from starlette.responses import Response
@@ -13,13 +12,12 @@ try:
         get_database_url,
         get_db,
         get_engine,
-        mask_database_url,
         reset_engine_cache,
     )
     from .models import Base, Task, TaskStatus
     from .schemas import TaskCreate, TaskRead, TaskStatusUpdate
 except ImportError:
-    from db import get_database_url, get_db, get_engine, mask_database_url, reset_engine_cache
+    from db import get_database_url, get_db, get_engine, reset_engine_cache
     from models import Base, Task, TaskStatus
     from schemas import TaskCreate, TaskRead, TaskStatusUpdate
 
@@ -54,7 +52,7 @@ def log_event(event: str, **kwargs) -> None:
         "event": event,
     }
     payload.update(kwargs)
-    print(json.dumps(payload, ensure_ascii=True))
+    print(json.dumps(payload, ensure_ascii=True), flush=True)
 
 
 def init_db() -> None:
@@ -83,11 +81,11 @@ def startup_event() -> None:
 
 @app.get("/")
 async def read_root():
-    db_url = get_database_url()
-    masked_db_url = mask_database_url(db_url)
-    return HTMLResponse(
-        f"<h1>Welcome to the API!</h1><p>DB URL (example): {masked_db_url}</p>"
-    )
+    return {
+        "service": "tasks-api",
+        "status": "ok",
+        "docs": "/docs",
+    }
 
 
 @app.get("/health")
