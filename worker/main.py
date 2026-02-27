@@ -68,26 +68,43 @@ def process_pending_tasks_once(limit: int = 10) -> int:
     query_select = text(
         "SELECT id, title FROM tasks WHERE status = 'pending' ORDER BY id ASC LIMIT :limit"
     )
-    query_update = text(
+    query_mark_in_progress = text(
+        "UPDATE tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP "
+        "WHERE id = :task_id AND status = 'pending'"
+    )
+    query_mark_done = text(
         "UPDATE tasks SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = :task_id"
+    )
+    query_mark_failed = text(
+        "UPDATE tasks SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = :task_id"
     )
 
     try:
         with get_engine().begin() as conn:
             rows = conn.execute(query_select, {"limit": limit}).fetchall()
+            processed_count = 0
             for row in rows:
-                print(f"Processing task id={row.id} title={row.title}")
-                conn.execute(query_update, {"task_id": row.id})
-            return len(rows)
+                reserved = conn.execute(query_mark_in_progress, {"task_id": row.id})
+                if reserved.rowcount != 1:
+                    continue
+
+                try:
+                    print(f"Processing task id={row.id} title={row.title}")
+                    conn.execute(query_mark_done, {"task_id": row.id})
+                except Exception:
+                    conn.execute(query_mark_failed, {"task_id": row.id})
+                processed_count += 1
+            return processed_count
     except SQLAlchemyError as exc:
         print(f"Failed to process tasks: {exc}")
         return 0
 
 
 def run_worker_loop(sleep_seconds: int = 5, iterations: int | None = None) -> None:
+    batch_size = int(os.environ.get("WORKER_BATCH_SIZE", "10"))
     counter = 0
     while True:
-        processed_count = process_pending_tasks_once()
+        processed_count = process_pending_tasks_once(limit=batch_size)
         if processed_count == 0:
             print("Worker is active, no pending tasks found.")
         else:

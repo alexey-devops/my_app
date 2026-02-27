@@ -59,6 +59,22 @@ def test_get_database_url_from_database_url_env(monkeypatch):
     assert api_main.get_database_url() == "sqlite:///./local.db"
 
 
+def test_get_database_url_prefers_secret_over_database_url(tmp_path, monkeypatch):
+    secret_file = tmp_path / "secret.txt"
+    secret_file.write_text("top-secret", encoding="utf-8")
+
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./local.db")
+    monkeypatch.setenv("POSTGRES_USER", "alice")
+    monkeypatch.setenv("POSTGRES_DB", "tasks")
+    monkeypatch.setenv("POSTGRES_HOST", "db")
+    monkeypatch.setenv("POSTGRES_PORT", "5432")
+    monkeypatch.setenv("POSTGRES_PASSWORD_FILE", str(secret_file))
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+
+    url = api_main.get_database_url()
+    assert url == "postgresql://alice:top-secret@db:5432/tasks"
+
+
 def test_health_endpoint(tmp_path, monkeypatch):
     db_file = tmp_path / "health.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
@@ -94,6 +110,35 @@ def test_create_and_list_tasks(tmp_path, monkeypatch):
         assert get_response.json()["id"] == task_id
 
 
+def test_list_tasks_with_status_filter_and_pagination(tmp_path, monkeypatch):
+    db_file = tmp_path / "tasks_filter.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+
+    with TestClient(api_main.app) as client:
+        first = client.post("/tasks", json={"title": "Task A"}).json()
+        second = client.post("/tasks", json={"title": "Task B"}).json()
+        third = client.post("/tasks", json={"title": "Task C"}).json()
+
+        patch_response = client.patch(
+            f"/tasks/{second['id']}/status", json={"status": "done"}
+        )
+        assert patch_response.status_code == 200
+        assert patch_response.json()["status"] == "done"
+
+        done_response = client.get("/tasks", params={"status": "done"})
+        assert done_response.status_code == 200
+        done_tasks = done_response.json()
+        assert len(done_tasks) == 1
+        assert done_tasks[0]["id"] == second["id"]
+
+        paged_response = client.get("/tasks", params={"limit": 2, "offset": 0})
+        assert paged_response.status_code == 200
+        paged_tasks = paged_response.json()
+        assert len(paged_tasks) == 2
+        assert paged_tasks[0]["id"] == third["id"]
+        assert paged_tasks[1]["id"] == second["id"]
+
+
 def test_create_task_rejects_blank_title(tmp_path, monkeypatch):
     db_file = tmp_path / "tasks_invalid.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
@@ -102,3 +147,13 @@ def test_create_task_rejects_blank_title(tmp_path, monkeypatch):
         response = client.post("/tasks", json={"title": "   "})
 
     assert response.status_code == 422
+
+
+def test_update_task_status_returns_404_for_unknown_id(tmp_path, monkeypatch):
+    db_file = tmp_path / "tasks_404.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
+
+    with TestClient(api_main.app) as client:
+        response = client.patch("/tasks/999/status", json={"status": "done"})
+
+    assert response.status_code == 404

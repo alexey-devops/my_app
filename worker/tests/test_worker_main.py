@@ -52,6 +52,22 @@ def test_get_database_url_from_database_url_env(monkeypatch):
     assert worker_main.get_database_url() == "sqlite:///./worker-local.db"
 
 
+def test_get_database_url_prefers_secret_over_database_url(tmp_path, monkeypatch):
+    secret_file = tmp_path / "worker-secret.txt"
+    secret_file.write_text("secret", encoding="utf-8")
+
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./worker-local.db")
+    monkeypatch.setenv("POSTGRES_USER", "worker")
+    monkeypatch.setenv("POSTGRES_DB", "tasks")
+    monkeypatch.setenv("POSTGRES_HOST", "db")
+    monkeypatch.setenv("POSTGRES_PORT", "5432")
+    monkeypatch.setenv("POSTGRES_PASSWORD_FILE", str(secret_file))
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+
+    url = worker_main.get_database_url()
+    assert url == "postgresql://worker:secret@db:5432/tasks"
+
+
 def test_process_pending_tasks_once(tmp_path, monkeypatch):
     db_file = tmp_path / "worker_tasks.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
@@ -77,5 +93,5 @@ def test_process_pending_tasks_once(tmp_path, monkeypatch):
 
 
 def test_run_worker_loop_with_single_iteration(monkeypatch):
-    monkeypatch.setattr(worker_main, "process_pending_tasks_once", lambda: 0)
+    monkeypatch.setattr(worker_main, "process_pending_tasks_once", lambda limit=10: 0)
     worker_main.run_worker_loop(sleep_seconds=0, iterations=1)
