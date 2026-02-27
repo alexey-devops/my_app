@@ -1,6 +1,10 @@
 import os
 import time
+from functools import lru_cache
 from urllib.parse import quote_plus
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 
 
 def _read_postgres_password() -> str:
@@ -21,6 +25,10 @@ def _read_postgres_password() -> str:
 
 
 def get_database_url() -> str:
+    direct_database_url = os.environ.get("DATABASE_URL")
+    if direct_database_url and not os.environ.get("POSTGRES_PASSWORD_FILE"):
+        return direct_database_url
+
     user = os.environ.get("POSTGRES_USER", "user")
     db_name = os.environ.get("POSTGRES_DB", "tasks_db")
     host = os.environ.get("POSTGRES_HOST", "db")
@@ -29,6 +37,20 @@ def get_database_url() -> str:
     safe_password = quote_plus(password)
 
     return f"postgresql://{user}:{safe_password}@{host}:{port}/{db_name}"
+
+
+@lru_cache(maxsize=1)
+def get_engine():
+    database_url = get_database_url()
+    if database_url.startswith("sqlite"):
+        return create_engine(
+            database_url, connect_args={"check_same_thread": False}, pool_pre_ping=True
+        )
+    return create_engine(database_url, pool_pre_ping=True)
+
+
+def reset_engine_cache() -> None:
+    get_engine.cache_clear()
 
 
 def mask_database_url(db_url: str) -> str:
@@ -42,10 +64,34 @@ def mask_database_url(db_url: str) -> str:
     return db_url
 
 
+def process_pending_tasks_once(limit: int = 10) -> int:
+    query_select = text(
+        "SELECT id, title FROM tasks WHERE status = 'pending' ORDER BY id ASC LIMIT :limit"
+    )
+    query_update = text(
+        "UPDATE tasks SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = :task_id"
+    )
+
+    try:
+        with get_engine().begin() as conn:
+            rows = conn.execute(query_select, {"limit": limit}).fetchall()
+            for row in rows:
+                print(f"Processing task id={row.id} title={row.title}")
+                conn.execute(query_update, {"task_id": row.id})
+            return len(rows)
+    except SQLAlchemyError as exc:
+        print(f"Failed to process tasks: {exc}")
+        return 0
+
+
 def run_worker_loop(sleep_seconds: int = 5, iterations: int | None = None) -> None:
     counter = 0
     while True:
-        print("Worker is active, performing dummy task...")
+        processed_count = process_pending_tasks_once()
+        if processed_count == 0:
+            print("Worker is active, no pending tasks found.")
+        else:
+            print(f"Worker processed {processed_count} task(s).")
         if iterations is not None:
             counter += 1
             if counter >= iterations:
@@ -56,7 +102,7 @@ def run_worker_loop(sleep_seconds: int = 5, iterations: int | None = None) -> No
 def main() -> None:
     print("Worker started. Listening for tasks...")
     db_url = get_database_url()
-    print(f"Worker using DB URL (example): {mask_database_url(db_url)}")
+    print(f"Worker using DB URL: {mask_database_url(db_url)}")
     run_worker_loop()
 
 

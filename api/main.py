@@ -61,7 +61,7 @@ def _read_postgres_password() -> str:
 
 def get_database_url() -> str:
     direct_database_url = os.environ.get("DATABASE_URL")
-    if direct_database_url:
+    if direct_database_url and not os.environ.get("POSTGRES_PASSWORD_FILE"):
         return direct_database_url
 
     user = os.environ.get("POSTGRES_USER", "user")
