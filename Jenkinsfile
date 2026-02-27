@@ -3,7 +3,6 @@ pipeline {
 
   options {
     timestamps()
-    ansiColor('xterm')
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '30'))
   }
@@ -85,7 +84,7 @@ pipeline {
   post {
     always {
       archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
-      cleanWs(cleanWhenNotBuilt: false, deleteDirs: true)
+      deleteDir()
     }
   }
 }
