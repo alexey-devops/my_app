@@ -1,4 +1,4 @@
 redis==4.1.0
-SQLAlchemy==1.4.27
+SQLAlchemy==2.0.47
 psycopg2-binary==2.9.3
 prometheus-client==0.20.0
