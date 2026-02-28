@@ -137,7 +137,6 @@ def buildTelegramMessage(String status, String summary) {
   def branch = (env.BRANCH_NAME ?: 'n/a').trim()
   def job = (env.JOB_NAME ?: 'n/a').trim()
   def buildNo = (env.BUILD_NUMBER ?: 'n/a').trim()
-  def buildUrl = resolveBuildUrl() ?: 'n/a'
   def sha = (env.GIT_COMMIT ?: '').trim()
   def shortSha = sha ? sha.take(7) : 'n/a'
   def subject = resolveCommitSubject()
@@ -150,7 +149,6 @@ Branch: ${branch}
 Build: #${buildNo}
 Commit: ${shortSha}
 Message: ${subject}
-URL: ${buildUrl}
 """.stripIndent().trim()
 }
 
