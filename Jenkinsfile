@@ -89,6 +89,25 @@ def notifyTelegram(String text) {
   }
 }
 
+def buildTelegramMessage(String status, String summary) {
+  def branch = (env.BRANCH_NAME ?: 'n/a').trim()
+  def job = (env.JOB_NAME ?: 'n/a').trim()
+  def buildNo = (env.BUILD_NUMBER ?: 'n/a').trim()
+  def buildUrl = (env.BUILD_URL ?: 'n/a').trim()
+  def sha = (env.GIT_COMMIT ?: '').trim()
+  def shortSha = sha ? sha.take(7) : 'n/a'
+
+  return """\
+Jenkins CI: ${status}
+Summary: ${summary}
+Job: ${job}
+Branch: ${branch}
+Build: #${buildNo}
+Commit: ${shortSha}
+URL: ${buildUrl}
+""".stripIndent().trim()
+}
+
 pipeline {
   agent any
 
@@ -194,25 +213,25 @@ pipeline {
     success {
       script {
         setGithubStatus('success', 'Jenkins pipeline passed')
-        notifyTelegram("Jenkins SUCCESS\\nJob: ${env.JOB_NAME}\\nBuild: #${env.BUILD_NUMBER}\\nURL: ${env.BUILD_URL}")
+        notifyTelegram(buildTelegramMessage('SUCCESS', 'All stages passed'))
       }
     }
     failure {
       script {
         setGithubStatus('failure', 'Jenkins pipeline failed')
-        notifyTelegram("Jenkins FAILURE\\nJob: ${env.JOB_NAME}\\nBuild: #${env.BUILD_NUMBER}\\nURL: ${env.BUILD_URL}")
+        notifyTelegram(buildTelegramMessage('FAILURE', 'Pipeline failed. Check build log'))
       }
     }
     aborted {
       script {
         setGithubStatus('error', 'Jenkins pipeline was aborted')
-        notifyTelegram("Jenkins ABORTED\\nJob: ${env.JOB_NAME}\\nBuild: #${env.BUILD_NUMBER}\\nURL: ${env.BUILD_URL}")
+        notifyTelegram(buildTelegramMessage('ABORTED', 'Build was aborted'))
       }
     }
     unstable {
       script {
         setGithubStatus('failure', 'Jenkins pipeline is unstable')
-        notifyTelegram("Jenkins UNSTABLE\\nJob: ${env.JOB_NAME}\\nBuild: #${env.BUILD_NUMBER}\\nURL: ${env.BUILD_URL}")
+        notifyTelegram(buildTelegramMessage('UNSTABLE', 'Build unstable. Inspect test reports'))
       }
     }
     always {
