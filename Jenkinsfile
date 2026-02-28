@@ -1,27 +1,70 @@
 def setGithubStatus(String state, String description) {
-  withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
+  def statusCredentialId = env.GITHUB_STATUS_CREDENTIALS_ID ?: 'my-app'
+  def remoteUrl = (env.GIT_URL ?: '').trim()
+  def sha = (env.GIT_COMMIT ?: '').trim()
+
+  if (!remoteUrl) {
+    remoteUrl = sh(script: "git config --get remote.origin.url 2>/dev/null || true", returnStdout: true).trim()
+  }
+  if (!sha) {
+    sha = sh(script: "git rev-parse HEAD 2>/dev/null || true", returnStdout: true).trim()
+  }
+
+  def repoSlug = ''
+  if (remoteUrl.startsWith('git@github.com:')) {
+    repoSlug = remoteUrl.replace('git@github.com:', '').replaceAll(/\.git$/, '')
+  } else if (remoteUrl.startsWith('https://github.com/')) {
+    repoSlug = remoteUrl.replace('https://github.com/', '').replaceAll(/\.git$/, '')
+  }
+
+  if (!repoSlug || !sha) {
+    echo "Skipping GitHub status update: could not resolve repo/sha (remote='${remoteUrl}', sha='${sha}')"
+    return
+  }
+
+  def publishWithTokenHeader = {
     sh """
       set -euo pipefail
-      REMOTE_URL=\$(git config --get remote.origin.url)
-      case "\$REMOTE_URL" in
-        git@github.com:*) REPO="\${REMOTE_URL#git@github.com:}" ;;
-        https://github.com/*) REPO="\${REMOTE_URL#https://github.com/}" ;;
-        *)
-          echo "Skipping GitHub status update for unsupported remote: \$REMOTE_URL"
-          exit 0
-          ;;
-      esac
-      REPO="\${REPO%.git}"
-      SHA=\$(git rev-parse HEAD)
       cat > /tmp/github-status.json <<JSON
 {"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${env.BUILD_URL ?: ''}"}
 JSON
       curl -fsS -X POST \\
         -H "Authorization: token \$GITHUB_TOKEN" \\
         -H "Accept: application/vnd.github+json" \\
-        "https://api.github.com/repos/\$REPO/statuses/\$SHA" \\
+        "https://api.github.com/repos/${repoSlug}/statuses/${sha}" \\
         -d @/tmp/github-status.json >/dev/null
     """
+  }
+
+  def publishWithBasicAuth = {
+    sh """
+      set -euo pipefail
+      cat > /tmp/github-status.json <<JSON
+{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${env.BUILD_URL ?: ''}"}
+JSON
+      curl -fsS -X POST \\
+        -u "\$GITHUB_USER:\$GITHUB_TOKEN" \\
+        -H "Accept: application/vnd.github+json" \\
+        "https://api.github.com/repos/${repoSlug}/statuses/${sha}" \\
+        -d @/tmp/github-status.json >/dev/null
+    """
+  }
+
+  try {
+    withCredentials([string(credentialsId: statusCredentialId, variable: 'GITHUB_TOKEN')]) {
+      publishWithTokenHeader()
+    }
+    return
+  } catch (Exception ignored) {
+    // Fallback to username/password credentials type.
+  }
+
+  try {
+    withCredentials([usernamePassword(credentialsId: statusCredentialId, usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
+      publishWithBasicAuth()
+    }
+  } catch (Exception e) {
+    echo "Skipping GitHub status update: ${e.getMessage()}"
   }
 }
 
