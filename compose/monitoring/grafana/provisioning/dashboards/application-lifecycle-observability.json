@@ -1,0 +1,660 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(probe_success{job=\"blackbox_api_gateway\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "API Gateway Health",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"pending\"}) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Pending Tasks",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"in_progress\"}) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "In Progress",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(task_lifecycle_api_created_total[$__rate_interval])) * 60 or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Created / min",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(task_lifecycle_processing_seconds_count[$__rate_interval])) * 60 or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Processed / min",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(task_lifecycle_status_count{status=\"failed\"}) / clamp_min(sum(task_lifecycle_status_count), 1)",
+          "refId": "A"
+        }
+      ],
+      "title": "Failed Share",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "gradientMode": "none"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 4
+      },
+      "id": 7,
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"pending\"}) or vector(0)",
+          "legendFormat": "pending",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"in_progress\"}) or vector(0)",
+          "legendFormat": "in_progress",
+          "instant": true,
+          "refId": "B"
+        },
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"done\"}) or vector(0)",
+          "legendFormat": "done",
+          "instant": true,
+          "refId": "C"
+        },
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"failed\"}) or vector(0)",
+          "legendFormat": "failed",
+          "instant": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Current Task Distribution",
+      "type": "bargauge"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"pending\"}) or vector(0)",
+          "legendFormat": "pending",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"in_progress\"}) or vector(0)",
+          "legendFormat": "in_progress",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"done\"}) or vector(0)",
+          "legendFormat": "done",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(task_lifecycle_status_count{status=\"failed\"}) or vector(0)",
+          "legendFormat": "failed",
+          "refId": "D"
+        }
+      ],
+      "title": "Task State Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 14,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(task_lifecycle_processing_seconds_sum[$__rate_interval])) / clamp_min(sum(rate(task_lifecycle_processing_seconds_count[$__rate_interval])), 0.0001)) or vector(0)",
+          "legendFormat": "avg duration",
+          "refId": "A"
+        }
+      ],
+      "title": "Processing Duration (avg)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Loki",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 11
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"api\"} |= \"POST /tasks\"[$__interval]))",
+          "legendFormat": "POST /tasks",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({container=\"api\"} |= \"GET /tasks\"[$__interval]))",
+          "legendFormat": "GET /tasks",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({container=\"api\"} |= \"PATCH /tasks\"[$__interval]))",
+          "legendFormat": "PATCH /tasks",
+          "refId": "C"
+        }
+      ],
+      "title": "API Request Activity (from logs)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Loki",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 12,
+            "lineWidth": 2,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"api\"} |~ \" 5[0-9]{2} |ERROR|Exception|Traceback\"[$__interval]))",
+          "legendFormat": "api errors",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({container=\"worker\"} |~ \"ERROR|Exception|Traceback\"[$__interval]))",
+          "legendFormat": "worker errors",
+          "refId": "B"
+        }
+      ],
+      "title": "Error Rate (from logs)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Loki",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 12,
+      "options": {
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "expr": "{container=\"api\"} |~ \"POST /tasks|PATCH /tasks|GET /tasks|ERROR|Exception|Traceback| 5[0-9]{2} \"",
+          "refId": "A"
+        }
+      ],
+      "title": "Live API Log Stream",
+      "type": "logs"
+    },
+    {
+      "datasource": "Loki",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "id": 13,
+      "options": {
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "expr": "{container=\"worker\"} |~ \"Worker is active|ERROR|Exception|Traceback|pending|in_progress|done|failed\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Live Worker Log Stream",
+      "type": "logs"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [
+    "application",
+    "loki",
+    "observability",
+    "lifecycle"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-5m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Application Lifecycle & Logs",
+  "uid": "app-lifecycle-logs",
+  "version": 3,
+  "weekStart": ""
+}
