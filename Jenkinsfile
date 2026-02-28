@@ -159,10 +159,8 @@ pipeline {
     timestamps()
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '30'))
-  }
-
-  triggers {
-    githubPush()
+    // Prevent duplicate rebuilds from Multibranch indexing (e.g. after Jenkins restart).
+    overrideIndexTriggers(false)
   }
 
   environment {
