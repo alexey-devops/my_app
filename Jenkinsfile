@@ -96,10 +96,9 @@ def resolveCommitSubject() {
     return fromEnv
   }
 
-  def sha = (env.GIT_COMMIT ?: 'HEAD').trim()
   try {
     def subject = sh(
-      script: "git log -1 --pretty=%s ${sha} 2>/dev/null || true",
+      script: "git show -s --format=%s HEAD 2>/dev/null || true",
       returnStdout: true
     ).trim()
     return subject ?: 'n/a'
