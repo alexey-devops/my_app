@@ -9,13 +9,16 @@ all: up
 build:
 	@echo "Building Docker images..."
 	$(DOCKER_COMPOSE) -f docker-compose.yml build
+	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml build
 
 up:
-	@echo "Bringing up Docker Compose stack..."
+	@echo "Bringing up Docker Compose stack (including Jenkins)..."
 	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) up -d --remove-orphans
+	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml --env-file $(ENV_FILE) up -d --build
 
 down:
-	@echo "Bringing down Docker Compose stack..."
+	@echo "Bringing down Docker Compose stack (including Jenkins)..."
+	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml --env-file $(ENV_FILE) down -v
 	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) down -v
 
 test:
@@ -53,16 +56,19 @@ db-downgrade:
 
 # Utility targets
 logs:
-	@echo "Showing Docker Compose logs..."
+	@echo "Showing Docker Compose logs (including Jenkins)..."
+	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml logs -f
 	$(DOCKER_COMPOSE) -f docker-compose.yml logs -f
 
 ps:
-	@echo "Listing Docker Compose services..."
+	@echo "Listing Docker Compose services (including Jenkins)..."
+	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml ps
 	$(DOCKER_COMPOSE) -f docker-compose.yml ps
 
 compose-validate:
 	@echo "Validating Docker Compose configuration..."
 	docker compose -f docker-compose.yml --env-file $(ENV_FILE) config >/tmp/compose.validated.yml
+	docker compose -f docker-compose.jenkins.yml --env-file $(ENV_FILE) config >/tmp/compose.jenkins.validated.yml
 	@echo "Compose config is valid."
 
 lint-yaml:

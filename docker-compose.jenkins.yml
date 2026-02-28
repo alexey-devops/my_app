@@ -9,8 +9,8 @@ services:
       JENKINS_ADMIN_ID: ${JENKINS_ADMIN_USER:-admin}
       JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-}
     ports:
-      - "127.0.0.1:8081:8080"
-      - "127.0.0.1:50000:50000"
+      - "8081:8080"
+      - "50000:50000"
     volumes:
       - ./.jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
