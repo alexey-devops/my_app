@@ -1,3 +1,30 @@
+def setGithubStatus(String state, String description) {
+  withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_TOKEN')]) {
+    sh """
+      set -euo pipefail
+      REMOTE_URL=\$(git config --get remote.origin.url)
+      case "\$REMOTE_URL" in
+        git@github.com:*) REPO="\${REMOTE_URL#git@github.com:}" ;;
+        https://github.com/*) REPO="\${REMOTE_URL#https://github.com/}" ;;
+        *)
+          echo "Skipping GitHub status update for unsupported remote: \$REMOTE_URL"
+          exit 0
+          ;;
+      esac
+      REPO="\${REPO%.git}"
+      SHA=\$(git rev-parse HEAD)
+      cat > /tmp/github-status.json <<JSON
+{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${env.BUILD_URL ?: ''}"}
+JSON
+      curl -fsS -X POST \\
+        -H "Authorization: token \$GITHUB_TOKEN" \\
+        -H "Accept: application/vnd.github+json" \\
+        "https://api.github.com/repos/\$REPO/statuses/\$SHA" \\
+        -d @/tmp/github-status.json >/dev/null
+    """
+  }
+}
+
 pipeline {
   agent any
 
@@ -22,6 +49,14 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
+      }
+    }
+
+    stage('Set GitHub Status: pending') {
+      steps {
+        script {
+          setGithubStatus('pending', 'Jenkins pipeline is running')
+        }
       }
     }
 
@@ -91,6 +126,26 @@ pipeline {
   }
 
   post {
+    success {
+      script {
+        setGithubStatus('success', 'Jenkins pipeline passed')
+      }
+    }
+    failure {
+      script {
+        setGithubStatus('failure', 'Jenkins pipeline failed')
+      }
+    }
+    aborted {
+      script {
+        setGithubStatus('error', 'Jenkins pipeline was aborted')
+      }
+    }
+    unstable {
+      script {
+        setGithubStatus('failure', 'Jenkins pipeline is unstable')
+      }
+    }
     always {
       archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
       deleteDir()

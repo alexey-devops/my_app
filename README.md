@@ -79,6 +79,8 @@ Pipeline стадии:
 - [JENKINS_LOCAL.md](JENKINS_LOCAL.md)
 - [DEVOPS.md](DEVOPS.md)
 
+Для "только после CI в main": включи branch protection на `main` и обязательный status check `ci/jenkins` (см. `JENKINS.md`).
+
 ## Структура статусов API
 
 - `POST /tasks`
