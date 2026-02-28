@@ -130,7 +130,8 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
-          TEST_CONTAINER="my-app-tests-${BUILD_NUMBER:-local}"
+          JOB_SAFE="$(echo "${JOB_NAME:-job}" | tr '/:% @' '_____')"
+          TEST_CONTAINER="my-app-tests-${JOB_SAFE}-${BUILD_NUMBER:-local}"
           docker rm -f "$TEST_CONTAINER" >/dev/null 2>&1 || true
           docker create --name "$TEST_CONTAINER" -w /work python:3.10-slim bash -lc "
             python -m pip install --upgrade pip &&
