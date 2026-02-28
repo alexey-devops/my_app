@@ -22,11 +22,13 @@ def setGithubStatus(String state, String description) {
     return
   }
 
+  def targetUrl = resolveBuildUrl()
+
   def publishWithTokenHeader = {
     sh """
       set -euo pipefail
       cat > /tmp/github-status.json <<JSON
-{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${env.BUILD_URL ?: ''}"}
+{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${targetUrl}"}
 JSON
       curl -fsS -X POST \\
         -H "Authorization: token \$GITHUB_TOKEN" \\
@@ -40,7 +42,7 @@ JSON
     sh """
       set -euo pipefail
       cat > /tmp/github-status.json <<JSON
-{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${env.BUILD_URL ?: ''}"}
+{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${targetUrl}"}
 JSON
       curl -fsS -X POST \\
         -u "\$GITHUB_USER:\$GITHUB_TOKEN" \\
@@ -65,6 +67,44 @@ JSON
     }
   } catch (Exception e) {
     echo "Skipping GitHub status update: ${e.getMessage()}"
+  }
+}
+
+def resolveBuildUrl() {
+  def raw = (env.BUILD_URL ?: '').trim()
+  def publicBase = (env.JENKINS_PUBLIC_URL ?: '').trim()
+  if (!publicBase) {
+    return raw
+  }
+
+  publicBase = publicBase.replaceAll('/+\$', '')
+  if (!raw) {
+    return publicBase
+  }
+
+  def m = (raw =~ /^https?:\\/\\/[^\\/]+(\\/.*)?\$/)
+  if (!m) {
+    return raw
+  }
+  def path = m[0][1] ?: '/'
+  return "${publicBase}${path}"
+}
+
+def resolveCommitSubject() {
+  def fromEnv = (env.GIT_COMMIT_MESSAGE ?: '').trim()
+  if (fromEnv) {
+    return fromEnv
+  }
+
+  def sha = (env.GIT_COMMIT ?: 'HEAD').trim()
+  try {
+    def subject = sh(
+      script: "git log -1 --pretty=%s ${sha} 2>/dev/null || true",
+      returnStdout: true
+    ).trim()
+    return subject ?: 'n/a'
+  } catch (Exception ignored) {
+    return 'n/a'
   }
 }
 
@@ -93,9 +133,10 @@ def buildTelegramMessage(String status, String summary) {
   def branch = (env.BRANCH_NAME ?: 'n/a').trim()
   def job = (env.JOB_NAME ?: 'n/a').trim()
   def buildNo = (env.BUILD_NUMBER ?: 'n/a').trim()
-  def buildUrl = (env.BUILD_URL ?: 'n/a').trim()
+  def buildUrl = resolveBuildUrl() ?: 'n/a'
   def sha = (env.GIT_COMMIT ?: '').trim()
   def shortSha = sha ? sha.take(7) : 'n/a'
+  def subject = resolveCommitSubject()
 
   return """\
 Jenkins CI: ${status}
@@ -104,6 +145,7 @@ Job: ${job}
 Branch: ${branch}
 Build: #${buildNo}
 Commit: ${shortSha}
+Message: ${subject}
 URL: ${buildUrl}
 """.stripIndent().trim()
 }
