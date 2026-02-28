@@ -22,11 +22,13 @@ def setGithubStatus(String state, String description) {
     return
   }
 
+  def targetUrl = resolveBuildUrl()
+
   def publishWithTokenHeader = {
     sh """
       set -euo pipefail
       cat > /tmp/github-status.json <<JSON
-{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${env.BUILD_URL ?: ''}"}
+{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${targetUrl}"}
 JSON
       curl -fsS -X POST \\
         -H "Authorization: token \$GITHUB_TOKEN" \\
@@ -40,7 +42,7 @@ JSON
     sh """
       set -euo pipefail
       cat > /tmp/github-status.json <<JSON
-{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${env.BUILD_URL ?: ''}"}
+{"state":"${state}","context":"ci/jenkins","description":"${description}","target_url":"${targetUrl}"}
 JSON
       curl -fsS -X POST \\
         -u "\$GITHUB_USER:\$GITHUB_TOKEN" \\
@@ -68,6 +70,88 @@ JSON
   }
 }
 
+def resolveBuildUrl() {
+  def raw = (env.BUILD_URL ?: '').trim()
+  def publicBase = (env.JENKINS_PUBLIC_URL ?: '').trim()
+  if (!publicBase) {
+    return raw
+  }
+
+  publicBase = publicBase.replaceAll('/+$', '')
+  if (!raw) {
+    return publicBase
+  }
+
+  def m = (raw =~ /^https?:\/\/[^\/]+(\/.*)?$/)
+  if (!m) {
+    return raw
+  }
+  def path = m[0][1] ?: '/'
+  return "${publicBase}${path}"
+}
+
+def resolveCommitSubject() {
+  def fromCaptured = (env.CI_COMMIT_SUBJECT ?: '').trim()
+  if (fromCaptured) {
+    return fromCaptured
+  }
+
+  def fromEnv = (env.GIT_COMMIT_MESSAGE ?: '').trim()
+  if (fromEnv) {
+    return fromEnv
+  }
+
+  try {
+    def subject = sh(
+      script: "git show -s --format=%s HEAD 2>/dev/null || true",
+      returnStdout: true
+    ).trim()
+    return subject ?: 'n/a'
+  } catch (Exception ignored) {
+    return 'n/a'
+  }
+}
+
+def notifyTelegram(String text) {
+  def tokenCredId = env.TELEGRAM_BOT_TOKEN_CREDENTIALS_ID ?: 'telegram-bot-token'
+  def chatCredId = env.TELEGRAM_CHAT_ID_CREDENTIALS_ID ?: 'telegram-chat-id'
+
+  try {
+    withCredentials([
+      string(credentialsId: tokenCredId, variable: 'TG_TOKEN'),
+      string(credentialsId: chatCredId, variable: 'TG_CHAT_ID')
+    ]) {
+      sh """
+        set -euo pipefail
+        curl -fsS -X POST "https://api.telegram.org/bot\${TG_TOKEN}/sendMessage" \\
+          -d "chat_id=\${TG_CHAT_ID}" \\
+          --data-urlencode "text=${text}" >/dev/null
+      """
+    }
+  } catch (Exception e) {
+    echo "Skipping Telegram notification: ${e.getMessage()}"
+  }
+}
+
+def buildTelegramMessage(String status, String summary) {
+  def branch = (env.BRANCH_NAME ?: 'n/a').trim()
+  def job = (env.JOB_NAME ?: 'n/a').trim()
+  def buildNo = (env.BUILD_NUMBER ?: 'n/a').trim()
+  def sha = (env.GIT_COMMIT ?: '').trim()
+  def shortSha = sha ? sha.take(7) : 'n/a'
+  def subject = resolveCommitSubject()
+
+  return """\
+Jenkins CI: ${status}
+Summary: ${summary}
+Job: ${job}
+Branch: ${branch}
+Build: #${buildNo}
+Commit: ${shortSha}
+Message: ${subject}
+""".stripIndent().trim()
+}
+
 pipeline {
   agent any
 
@@ -92,6 +176,12 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
+        script {
+          env.CI_COMMIT_SUBJECT = sh(
+            script: "git show -s --format=%s HEAD 2>/dev/null || true",
+            returnStdout: true
+          ).trim()
+        }
       }
     }
 
@@ -173,21 +263,25 @@ pipeline {
     success {
       script {
         setGithubStatus('success', 'Jenkins pipeline passed')
+        notifyTelegram(buildTelegramMessage('SUCCESS', 'All stages passed'))
       }
     }
     failure {
       script {
         setGithubStatus('failure', 'Jenkins pipeline failed')
+        notifyTelegram(buildTelegramMessage('FAILURE', 'Pipeline failed. Check build log'))
       }
     }
     aborted {
       script {
         setGithubStatus('error', 'Jenkins pipeline was aborted')
+        notifyTelegram(buildTelegramMessage('ABORTED', 'Build was aborted'))
       }
     }
     unstable {
       script {
         setGithubStatus('failure', 'Jenkins pipeline is unstable')
+        notifyTelegram(buildTelegramMessage('UNSTABLE', 'Build unstable. Inspect test reports'))
       }
     }
     always {
