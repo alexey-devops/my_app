@@ -77,12 +77,12 @@ def resolveBuildUrl() {
     return raw
   }
 
-  publicBase = publicBase.replaceAll('/+\$', '')
+  publicBase = publicBase.replaceAll('/+$', '')
   if (!raw) {
     return publicBase
   }
 
-  def m = (raw =~ /^https?:\\/\\/[^\\/]+(\\/.*)?\$/)
+  def m = (raw =~ /^https?:\/\/[^\/]+(\/.*)?$/)
   if (!m) {
     return raw
   }
@@ -91,6 +91,11 @@ def resolveBuildUrl() {
 }
 
 def resolveCommitSubject() {
+  def fromCaptured = (env.CI_COMMIT_SUBJECT ?: '').trim()
+  if (fromCaptured) {
+    return fromCaptured
+  }
+
   def fromEnv = (env.GIT_COMMIT_MESSAGE ?: '').trim()
   if (fromEnv) {
     return fromEnv
@@ -173,6 +178,12 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
+        script {
+          env.CI_COMMIT_SUBJECT = sh(
+            script: "git show -s --format=%s HEAD 2>/dev/null || true",
+            returnStdout: true
+          ).trim()
+        }
       }
     }
 
