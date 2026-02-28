@@ -68,6 +68,27 @@ JSON
   }
 }
 
+def notifyTelegram(String text) {
+  def tokenCredId = env.TELEGRAM_BOT_TOKEN_CREDENTIALS_ID ?: 'telegram-bot-token'
+  def chatCredId = env.TELEGRAM_CHAT_ID_CREDENTIALS_ID ?: 'telegram-chat-id'
+
+  try {
+    withCredentials([
+      string(credentialsId: tokenCredId, variable: 'TG_TOKEN'),
+      string(credentialsId: chatCredId, variable: 'TG_CHAT_ID')
+    ]) {
+      sh """
+        set -euo pipefail
+        curl -fsS -X POST "https://api.telegram.org/bot\${TG_TOKEN}/sendMessage" \\
+          -d "chat_id=\${TG_CHAT_ID}" \\
+          --data-urlencode "text=${text}" >/dev/null
+      """
+    }
+  } catch (Exception e) {
+    echo "Skipping Telegram notification: ${e.getMessage()}"
+  }
+}
+
 pipeline {
   agent any
 
@@ -173,21 +194,25 @@ pipeline {
     success {
       script {
         setGithubStatus('success', 'Jenkins pipeline passed')
+        notifyTelegram("Jenkins SUCCESS\\nJob: ${env.JOB_NAME}\\nBuild: #${env.BUILD_NUMBER}\\nURL: ${env.BUILD_URL}")
       }
     }
     failure {
       script {
         setGithubStatus('failure', 'Jenkins pipeline failed')
+        notifyTelegram("Jenkins FAILURE\\nJob: ${env.JOB_NAME}\\nBuild: #${env.BUILD_NUMBER}\\nURL: ${env.BUILD_URL}")
       }
     }
     aborted {
       script {
         setGithubStatus('error', 'Jenkins pipeline was aborted')
+        notifyTelegram("Jenkins ABORTED\\nJob: ${env.JOB_NAME}\\nBuild: #${env.BUILD_NUMBER}\\nURL: ${env.BUILD_URL}")
       }
     }
     unstable {
       script {
         setGithubStatus('failure', 'Jenkins pipeline is unstable')
+        notifyTelegram("Jenkins UNSTABLE\\nJob: ${env.JOB_NAME}\\nBuild: #${env.BUILD_NUMBER}\\nURL: ${env.BUILD_URL}")
       }
     }
     always {
