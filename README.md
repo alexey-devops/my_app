@@ -73,8 +73,6 @@ Pipeline стадии:
 4. `Autotests`
 5. `Build Docker Images`
 
-Техническая пометка: не-функциональное тестовое изменение в ветке `test`.
-
 Подробная настройка:
 
 - [JENKINS.md](JENKINS.md)
