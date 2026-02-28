@@ -2,3 +2,4 @@ ci gate test 2026-02-28T12:18:50+03:00
 ci gate retest 2026-02-28T12:21:51+03:00
 ci gate polling retest 2026-02-28T12:23:34+03:00
 ci gate webhook retest 2026-02-28T12:29:33+03:00
+ci gate wildcard retest 2026-02-28T12:31:03+03:00
