@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-metrics
+  namespace: my-app
+spec:
+  selector:
+    app: worker
+  ports:
+    - name: metrics
+      port: 9102
+      targetPort: 9102

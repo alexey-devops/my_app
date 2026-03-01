@@ -48,6 +48,37 @@ make up
 - Grafana: `https://localhost:8443/grafana/`
 - Prometheus: `https://localhost:8443/prometheus/`
 
+## Kubernetes (kind) Quick Start
+
+Для постепенного перехода на K8s добавлен базовый контур в `k8s/`:
+- `k8s/base` - namespace, config/secret, postgres, api, worker, frontend, gateway.
+- `k8s/overlays/dev` - dev overlay через `kustomize`.
+
+Пошагово:
+
+1. Остановить compose-стек (чтобы не конфликтовать по ресурсам/портам):
+```bash
+make down
+```
+
+2. Поднять локальный кластер и задеплоить базу:
+```bash
+make k8s-bootstrap
+```
+
+3. Проверить состояние:
+```bash
+make k8s-status
+```
+
+4. Открыть приложение:
+- `http://localhost:8088`
+
+Полезные команды:
+- `make k8s-apply` - повторно применить манифесты
+- `make k8s-delete` - удалить манифесты из кластера
+- `make k8s-kind-delete` - удалить kind-кластер
+
 ## Demo Mode (для собеседования)
 
 Чтобы приложение выглядело «живым» без ручных действий:

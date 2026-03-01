@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: my-app
+data:
+  POSTGRES_DB: tasks_db
+  POSTGRES_USER: user
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  WORKER_METRICS_PORT: "9102"
+  WORKER_DEMO_MODE: "1"
+  WORKER_AUTOPROCESS_ENABLED: "1"
+  WORKER_PROCESSING_DELAY_SECONDS: "3"
+  WORKER_LOOP_SLEEP_SECONDS: "3"
+  API_LOG_HEALTHCHECKS: "0"
+  API_LOG_UI_POLLING: "0"

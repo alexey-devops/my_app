@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+namespace: my-app
+images:
+  - name: my-app/api
+    newTag: dev
+  - name: my-app/worker
+    newTag: dev
+  - name: my-app/frontend
+    newTag: dev

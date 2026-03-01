@@ -1,8 +1,12 @@
-.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow
+.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap
 
 # Default to .env if not specified
 ENV_FILE ?= .env
 DOCKER_COMPOSE ?= docker compose
+KIND_CLUSTER_NAME ?= my-app-kind
+K8S_NAMESPACE ?= my-app
+K8S_OVERLAY ?= k8s/overlays/dev
+KIND_TMPDIR ?= $(PWD)/.tmp-kind
 
 all: up
 
@@ -84,3 +88,39 @@ lint-dockerfiles:
 demo-flow:
 	@echo "Generating live demo events in API/worker..."
 	./scripts/demo_flow.sh "$(DEMO_BASE_URL)"
+
+k8s-kind-create:
+	@echo "Creating kind cluster $(KIND_CLUSTER_NAME)..."
+	kind create cluster --name $(KIND_CLUSTER_NAME) --config k8s/kind-config.yaml
+
+k8s-kind-delete:
+	@echo "Deleting kind cluster $(KIND_CLUSTER_NAME)..."
+	kind delete cluster --name $(KIND_CLUSTER_NAME)
+
+k8s-build-images:
+	@echo "Building local images for kind..."
+	docker build -t my-app/api:dev ./api
+	docker build -t my-app/worker:dev ./worker
+	docker build -t my-app/frontend:dev ./frontend
+
+k8s-load-images:
+	@echo "Loading images into kind cluster $(KIND_CLUSTER_NAME)..."
+	mkdir -p $(KIND_TMPDIR)
+	TMPDIR=$(KIND_TMPDIR) kind load docker-image my-app/api:dev --name $(KIND_CLUSTER_NAME)
+	TMPDIR=$(KIND_TMPDIR) kind load docker-image my-app/worker:dev --name $(KIND_CLUSTER_NAME)
+	TMPDIR=$(KIND_TMPDIR) kind load docker-image my-app/frontend:dev --name $(KIND_CLUSTER_NAME)
+
+k8s-apply:
+	@echo "Applying Kubernetes manifests from $(K8S_OVERLAY)..."
+	kubectl apply -k $(K8S_OVERLAY)
+
+k8s-delete:
+	@echo "Deleting Kubernetes manifests from $(K8S_OVERLAY)..."
+	kubectl delete -k $(K8S_OVERLAY) --ignore-not-found
+
+k8s-status:
+	@echo "Kubernetes resources in namespace $(K8S_NAMESPACE):"
+	kubectl get pods,svc,deploy -n $(K8S_NAMESPACE)
+
+k8s-bootstrap: k8s-kind-create k8s-build-images k8s-load-images k8s-apply k8s-status
+	@echo "kind bootstrap completed. App gateway is exposed on http://localhost:8088"
