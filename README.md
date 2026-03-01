@@ -48,6 +48,37 @@ make up
 - Grafana: `https://localhost:8443/grafana/`
 - Prometheus: `https://localhost:8443/prometheus/`
 
+## Demo Mode (для собеседования)
+
+Чтобы приложение выглядело «живым» без ручных действий:
+
+- в `.env` установи:
+  - `WORKER_AUTOPROCESS_ENABLED=0` (worker не перехватывает pending автоматически)
+  - `SIMULATOR_ENABLED=1`
+  - `SIMULATOR_CREATE_MIN_DELAY_SECONDS=20`
+  - `SIMULATOR_CREATE_MAX_DELAY_SECONDS=45`
+  - `SIMULATOR_STAGE_MIN_DELAY_SECONDS=15`
+  - `SIMULATOR_STAGE_MAX_DELAY_SECONDS=35`
+  - `API_LOG_HEALTHCHECKS=0`
+- перезапусти сервисы: `make up`
+
+С этого момента `simulator` сам:
+
+1. периодически создаёт задачи,
+2. переводит их в `in_progress`,
+3. затем в `done` или `failed`,
+4. делает это с рандомными «человеческими» паузами.
+
+Дополнительно:
+
+- симулятор удерживает ограниченное количество задач (`SIMULATOR_MAX_TASKS`) и периодически чистит старые записи, чтобы БД не разрасталась бесконечно.
+
+Что показывать в Grafana:
+
+- `Application Lifecycle & Logs`: KPI задач, runtime activity, live API/worker streams.
+- `Service Command Center`: внешняя доступность API через Nginx + critical logs.
+- `Server Load & Capacity`: нагрузка CPU/RAM/IO во время demo-flow.
+
 ## Безопасные дефолты
 
 - Пароли не передаются через `DATABASE_URL` в compose.

@@ -247,7 +247,7 @@
     .tasks {
       display: grid;
       gap: 10px;
-      margin-top: 12px;
+      margin-top: 10px;
     }
 
     .task {
@@ -258,6 +258,22 @@
       display: grid;
       gap: 10px;
       animation: pop 0.2s ease-out;
+    }
+
+    .tasks-wrap {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #ffffff;
+      padding: 10px;
+      max-height: 62vh;
+      overflow: auto;
+    }
+
+    .show-more {
+      margin-top: 10px;
+      width: 100%;
+      background: linear-gradient(135deg, #22c1ee, #0ea5e9);
     }
 
     .task-head {
@@ -405,7 +421,11 @@
           <button class="ghost" id="refreshBtn">Refresh</button>
         </div>
         <p class="muted" id="summary">Loading tasks...</p>
-        <div class="tasks" id="tasks"></div>
+
+        <div class="tasks-wrap">
+          <div class="tasks" id="tasksRoot"></div>
+        </div>
+        <button class="show-more" id="showMoreBtn" style="display:none;">Show all remaining tasks</button>
       </section>
     </section>
   </main>
@@ -419,8 +439,9 @@
     const createBtn = document.getElementById("createBtn");
     const refreshBtn = document.getElementById("refreshBtn");
     const statusFilter = document.getElementById("statusFilter");
-    const tasksRoot = document.getElementById("tasks");
+    const tasksRoot = document.getElementById("tasksRoot");
     const summary = document.getElementById("summary");
+    const showMoreBtn = document.getElementById("showMoreBtn");
     const toast = document.getElementById("toast");
 
     const kpiTotal = document.getElementById("kpiTotal");
@@ -428,9 +449,10 @@
     const kpiProgress = document.getElementById("kpiProgress");
     const kpiFailed = document.getElementById("kpiFailed");
 
-    let allTasksCache = [];
     let lastRenderSignature = "";
     let autoRefreshHandle = null;
+    let showAllTasks = false;
+    const TASKS_VISIBLE_LIMIT = 10;
 
     function showToast(message) {
       toast.textContent = message;
@@ -561,21 +583,40 @@
           return;
         }
 
-        allTasksCache = freshTasks;
         lastRenderSignature = freshSignature;
         tasksRoot.innerHTML = "";
         updateKPIs(freshTasks);
 
         if (freshTasks.length === 0) {
           summary.textContent = "No tasks found for selected filter.";
+          showMoreBtn.style.display = "none";
+          showAllTasks = false;
           return;
         }
 
-        summary.textContent = `Showing ${freshTasks.length} task(s)`;
-        freshTasks.forEach(task => tasksRoot.appendChild(taskCard(task, !silent)));
+        const overflowCount = Math.max(0, freshTasks.length - TASKS_VISIBLE_LIMIT);
+        const visibleTasks = showAllTasks ? freshTasks : freshTasks.slice(0, TASKS_VISIBLE_LIMIT);
+
+        summary.textContent = showAllTasks
+          ? `Showing all ${freshTasks.length} task(s)`
+          : `Showing top ${visibleTasks.length} of ${freshTasks.length} task(s)`;
+
+        visibleTasks.forEach(task => tasksRoot.appendChild(taskCard(task, !silent)));
+
+        if (overflowCount > 0) {
+          showMoreBtn.style.display = "inline-block";
+          showMoreBtn.textContent = showAllTasks
+            ? "Show only top 10 tasks"
+            : `Show all remaining tasks (+${overflowCount})`;
+        } else {
+          showMoreBtn.style.display = "none";
+          showAllTasks = false;
+        }
       } catch {
         summary.textContent = "Failed to load tasks.";
         tasksRoot.innerHTML = "";
+        showMoreBtn.style.display = "none";
+        showAllTasks = false;
       }
     }
 
@@ -605,7 +646,12 @@
     refreshBtn.addEventListener("click", () => renderTasks({ force: true }));
     statusFilter.addEventListener("change", () => {
       lastRenderSignature = "";
+      showAllTasks = false;
       renderTasks({ force: true });
+    });
+    showMoreBtn.addEventListener("click", () => {
+      showAllTasks = !showAllTasks;
+      renderTasks({ force: true, silent: true });
     });
     taskInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") createTask();

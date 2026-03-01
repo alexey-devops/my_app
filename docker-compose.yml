@@ -106,6 +106,33 @@ services:
       timeout: 5s
       retries: 5
 
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    container_name: simulator
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-1}
+      SIMULATOR_API_BASE_URL: ${SIMULATOR_API_BASE_URL:-http://api:8000}
+      SIMULATOR_TASK_TITLE_PREFIX: ${SIMULATOR_TASK_TITLE_PREFIX:-Live Task}
+      SIMULATOR_CREATE_MIN_DELAY_SECONDS: ${SIMULATOR_CREATE_MIN_DELAY_SECONDS:-15}
+      SIMULATOR_CREATE_MAX_DELAY_SECONDS: ${SIMULATOR_CREATE_MAX_DELAY_SECONDS:-30}
+      SIMULATOR_STAGE_MIN_DELAY_SECONDS: ${SIMULATOR_STAGE_MIN_DELAY_SECONDS:-15}
+      SIMULATOR_STAGE_MAX_DELAY_SECONDS: ${SIMULATOR_STAGE_MAX_DELAY_SECONDS:-30}
+      SIMULATOR_FAIL_RATE: ${SIMULATOR_FAIL_RATE:-0.2}
+      SIMULATOR_FAIL_TAG_RATE: ${SIMULATOR_FAIL_TAG_RATE:-0.35}
+      SIMULATOR_BURST_SIZE: ${SIMULATOR_BURST_SIZE:-3}
+      SIMULATOR_MAX_TASKS: ${SIMULATOR_MAX_TASKS:-60}
+      SIMULATOR_CLEANUP_INTERVAL_SECONDS: ${SIMULATOR_CLEANUP_INTERVAL_SECONDS:-15}
+    networks:
+      - app_network
+    depends_on:
+      api:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./frontend
@@ -154,6 +181,8 @@ services:
       - ./compose/monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9090:9090"
     networks:
@@ -170,7 +199,8 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
-      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 15s
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 1s
+      GF_METRICS_ENABLED: "true"
     ports:
       - "3000:3000"
     networks:
@@ -198,7 +228,6 @@ services:
     image: grafana/promtail:2.5.0
     container_name: promtail
     restart: unless-stopped
-    profiles: ["logs"]
     command: -config.file=/etc/promtail/config.yml
     volumes:
       - ./compose/monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
@@ -207,6 +236,19 @@ services:
       - app_network
     depends_on:
       - loki
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: blackbox_exporter
+    restart: unless-stopped
+    volumes:
+      - ./compose/monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+    ports:
+      - "9115:9115"
+    networks:
+      - app_network
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:1.4.1
@@ -233,6 +275,40 @@ services:
       - app_network
     depends_on:
       - redis
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres_exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: "db:5432/${POSTGRES_DB}?sslmode=disable"
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - export DATA_SOURCE_PASS="$(cat /run/secrets/postgres_password)" && exec /bin/postgres_exporter
+    ports:
+      - "9187:9187"
+    networks:
+      - app_network
+    secrets:
+      - postgres_password
+    depends_on:
+      - db
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node_exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    ports:
+      - "9100:9100"
+    volumes:
+      - '/:/host:ro'
+    networks:
+      - app_network
 
   # Private Docker Registry
   registry:
