@@ -155,6 +155,10 @@ Message: ${subject}
 pipeline {
   agent any
 
+  triggers {
+    githubPush()
+  }
+
   options {
     timestamps()
     disableConcurrentBuilds()
