@@ -83,7 +83,7 @@ def log_event(event: str, **kwargs) -> None:
         "event": event,
     }
     payload.update(kwargs)
-    print(json.dumps(payload, ensure_ascii=True), flush=True)
+    print(json.dumps(payload, ensure_ascii=True, separators=(",", ":")), flush=True)
 
 
 def _read_float_env(
@@ -194,9 +194,11 @@ def should_fail_task(task_title: str) -> bool:
 
 def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Optional[float] = None) -> int:
     if processing_delay_seconds is None:
+        demo_mode = os.environ.get("WORKER_DEMO_MODE", "0") == "1"
+        default_delay = 8.0 if demo_mode else 3.0
         processing_delay_seconds = _read_float_env(
             "WORKER_PROCESSING_DELAY_SECONDS",
-            default=3.0,
+            default=default_delay,
             min_value=0.0,
         )
 
@@ -301,9 +303,28 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
 
 def run_worker_loop(sleep_seconds: int = 5, iterations: int | None = None) -> None:
     batch_size = _read_int_env("WORKER_BATCH_SIZE", default=10, min_value=1)
+    autoprocess_enabled = os.environ.get("WORKER_AUTOPROCESS_ENABLED", "1") == "1"
+    log_event(
+        "worker_loop_started",
+        sleep_seconds=sleep_seconds,
+        batch_size=batch_size,
+        autoprocess_enabled=autoprocess_enabled,
+        demo_mode=(os.environ.get("WORKER_DEMO_MODE", "0") == "1"),
+    )
     counter = 0
     while True:
-        processed_count = process_pending_tasks_once(limit=batch_size)
+        if autoprocess_enabled:
+            processed_count = process_pending_tasks_once(limit=batch_size)
+        else:
+            refresh_status_metrics()
+            processed_count = 0
+            log_event("worker_autoprocess_disabled", sleep_seconds=sleep_seconds)
+        log_event(
+            "worker_cycle",
+            processed_count=processed_count,
+            sleep_seconds=sleep_seconds,
+            batch_size=batch_size,
+        )
         if processed_count == 0:
             print("Worker is active, no pending tasks found.", flush=True)
         else:
@@ -317,12 +338,17 @@ def run_worker_loop(sleep_seconds: int = 5, iterations: int | None = None) -> No
 
 def main() -> None:
     metrics_port = int(os.environ.get("WORKER_METRICS_PORT", "9102"))
+    loop_sleep_seconds = _read_float_env(
+        "WORKER_LOOP_SLEEP_SECONDS",
+        default=2.0,
+        min_value=0.1,
+    )
     start_http_server(metrics_port)
     refresh_status_metrics()
     log_event("worker_started", metrics_port=metrics_port)
     db_url = get_database_url()
     log_event("worker_db_ready", database_url_masked=mask_database_url(db_url))
-    run_worker_loop()
+    run_worker_loop(sleep_seconds=loop_sleep_seconds)
 
 
 if __name__ == "__main__":

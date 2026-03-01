@@ -106,6 +106,33 @@ services:
       timeout: 5s
       retries: 5
 
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    container_name: simulator
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-1}
+      SIMULATOR_API_BASE_URL: ${SIMULATOR_API_BASE_URL:-http://api:8000}
+      SIMULATOR_TASK_TITLE_PREFIX: ${SIMULATOR_TASK_TITLE_PREFIX:-Live Task}
+      SIMULATOR_CREATE_MIN_DELAY_SECONDS: ${SIMULATOR_CREATE_MIN_DELAY_SECONDS:-15}
+      SIMULATOR_CREATE_MAX_DELAY_SECONDS: ${SIMULATOR_CREATE_MAX_DELAY_SECONDS:-30}
+      SIMULATOR_STAGE_MIN_DELAY_SECONDS: ${SIMULATOR_STAGE_MIN_DELAY_SECONDS:-15}
+      SIMULATOR_STAGE_MAX_DELAY_SECONDS: ${SIMULATOR_STAGE_MAX_DELAY_SECONDS:-30}
+      SIMULATOR_FAIL_RATE: ${SIMULATOR_FAIL_RATE:-0.2}
+      SIMULATOR_FAIL_TAG_RATE: ${SIMULATOR_FAIL_TAG_RATE:-0.35}
+      SIMULATOR_BURST_SIZE: ${SIMULATOR_BURST_SIZE:-3}
+      SIMULATOR_MAX_TASKS: ${SIMULATOR_MAX_TASKS:-60}
+      SIMULATOR_CLEANUP_INTERVAL_SECONDS: ${SIMULATOR_CLEANUP_INTERVAL_SECONDS:-15}
+    networks:
+      - app_network
+    depends_on:
+      api:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./frontend
@@ -172,7 +199,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
-      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 15s
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 1s
       GF_METRICS_ENABLED: "true"
     ports:
       - "3000:3000"

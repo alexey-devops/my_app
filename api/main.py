@@ -1,9 +1,11 @@
 import json
+import os
+import time
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from sqlalchemy.orm import Session
 from starlette.responses import Response
 
@@ -32,6 +34,17 @@ TASK_STATUS_UPDATES_TOTAL = Counter(
     "Task status updates triggered via API.",
     ["from_status", "to_status"],
 )
+API_HTTP_REQUESTS_TOTAL = Counter(
+    "task_lifecycle_api_http_requests_total",
+    "HTTP requests handled by API grouped by method, normalized path and status class.",
+    ["method", "path", "status_class"],
+)
+API_HTTP_REQUEST_DURATION_SECONDS = Histogram(
+    "task_lifecycle_api_http_request_duration_seconds",
+    "API HTTP request duration in seconds by method and normalized path.",
+    ["method", "path"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5),
+)
 TASK_STATUS_COUNT = Gauge(
     "task_lifecycle_api_status_count",
     "Current number of tasks by status from API perspective.",
@@ -52,7 +65,25 @@ def log_event(event: str, **kwargs) -> None:
         "event": event,
     }
     payload.update(kwargs)
-    print(json.dumps(payload, ensure_ascii=True), flush=True)
+    print(json.dumps(payload, ensure_ascii=True, separators=(",", ":")), flush=True)
+
+
+def _normalize_request_path(path: str) -> str:
+    if path.startswith("/tasks/") and path.endswith("/status"):
+        return "/tasks/:id/status"
+    if path.startswith("/tasks/"):
+        return "/tasks/:id"
+    return path
+
+
+def _should_log_request(path: str, method: str, query: str) -> bool:
+    noisy_paths = {"/health", "/metrics"}
+    if path not in noisy_paths:
+        # Frontend polling can flood logs and hide meaningful lifecycle events.
+        if path == "/tasks" and method == "GET" and "limit=100" in query:
+            return os.environ.get("API_LOG_UI_POLLING", "0") == "1"
+        return True
+    return os.environ.get("API_LOG_HEALTHCHECKS", "0") == "1"
 
 
 def init_db() -> None:
@@ -77,6 +108,43 @@ def startup_event() -> None:
         refresh_status_metrics(session)
     finally:
         session.close()
+
+
+@app.middleware("http")
+async def request_observability_middleware(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    duration_seconds = time.perf_counter() - started
+
+    normalized_path = _normalize_request_path(request.url.path)
+    status_code = response.status_code
+    status_class = f"{status_code // 100}xx"
+    method = request.method
+
+    API_HTTP_REQUESTS_TOTAL.labels(
+        method=method,
+        path=normalized_path,
+        status_class=status_class,
+    ).inc()
+    API_HTTP_REQUEST_DURATION_SECONDS.labels(
+        method=method,
+        path=normalized_path,
+    ).observe(duration_seconds)
+
+    if _should_log_request(request.url.path, method, request.url.query):
+        actor = request.headers.get("X-Simulated-Actor", "").strip()
+        log_event(
+            "api_http_request",
+            method=method,
+            path=normalized_path,
+            raw_path=request.url.path,
+            query=request.url.query,
+            status_code=status_code,
+            duration_ms=round(duration_seconds * 1000, 2),
+            client=(request.client.host if request.client else "unknown"),
+            actor=(actor or "n/a"),
+        )
+    return response
 
 
 @app.get("/")
@@ -167,6 +235,28 @@ def update_task_status(task_id: int, payload: TaskStatusUpdate, db: Session = De
         source="api",
     )
     return task
+
+
+@app.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    deleted_id = task.id
+    deleted_title = task.title
+    deleted_status = task.status
+    db.delete(task)
+    db.commit()
+    refresh_status_metrics(db)
+    log_event(
+        "task_deleted",
+        task_id=deleted_id,
+        title=deleted_title,
+        status=deleted_status,
+        source="api",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 __all__ = ["app", "init_db", "reset_engine_cache"]
