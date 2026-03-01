@@ -116,7 +116,7 @@
       },
       "targets": [
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"pending\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"pending\"}) or sum(task_lifecycle_api_status_count{status=\"pending\"}) or vector(0))",
           "refId": "A"
         }
       ],
@@ -169,7 +169,7 @@
       },
       "targets": [
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"in_progress\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"in_progress\"}) or sum(task_lifecycle_api_status_count{status=\"in_progress\"}) or vector(0))",
           "refId": "A"
         }
       ],
@@ -322,7 +322,7 @@
       },
       "targets": [
         {
-          "expr": "100 * sum(task_lifecycle_status_count{status=\"failed\"}) / clamp_min(sum(task_lifecycle_status_count), 1)",
+          "expr": "100 * ((sum(task_lifecycle_status_count{status=\"failed\"}) or sum(task_lifecycle_api_status_count{status=\"failed\"}) or vector(0)) / clamp_min((sum(task_lifecycle_status_count) or sum(task_lifecycle_api_status_count) or vector(0)), 1))",
           "refId": "A"
         }
       ],
@@ -362,25 +362,25 @@
       },
       "targets": [
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"pending\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"pending\"}) or sum(task_lifecycle_api_status_count{status=\"pending\"}) or vector(0))",
           "legendFormat": "pending",
           "instant": true,
           "refId": "A"
         },
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"in_progress\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"in_progress\"}) or sum(task_lifecycle_api_status_count{status=\"in_progress\"}) or vector(0))",
           "legendFormat": "in_progress",
           "instant": true,
           "refId": "B"
         },
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"done\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"done\"}) or sum(task_lifecycle_api_status_count{status=\"done\"}) or vector(0))",
           "legendFormat": "done",
           "instant": true,
           "refId": "C"
         },
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"failed\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"failed\"}) or sum(task_lifecycle_api_status_count{status=\"failed\"}) or vector(0))",
           "legendFormat": "failed",
           "instant": true,
           "refId": "D"
@@ -423,22 +423,22 @@
       },
       "targets": [
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"pending\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"pending\"}) or sum(task_lifecycle_api_status_count{status=\"pending\"}) or vector(0))",
           "legendFormat": "pending",
           "refId": "A"
         },
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"in_progress\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"in_progress\"}) or sum(task_lifecycle_api_status_count{status=\"in_progress\"}) or vector(0))",
           "legendFormat": "in_progress",
           "refId": "B"
         },
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"done\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"done\"}) or sum(task_lifecycle_api_status_count{status=\"done\"}) or vector(0))",
           "legendFormat": "done",
           "refId": "C"
         },
         {
-          "expr": "sum(task_lifecycle_status_count{status=\"failed\"}) or vector(0)",
+          "expr": "(sum(task_lifecycle_status_count{status=\"failed\"}) or sum(task_lifecycle_api_status_count{status=\"failed\"}) or vector(0))",
           "legendFormat": "failed",
           "refId": "D"
         }
@@ -488,7 +488,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": "Loki",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
@@ -521,26 +521,31 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({container=\"api\"} |~ \"\\\"event\\\":\\\"api_http_request\\\"\" |~ \"\\\"path\\\":\\\"/tasks\\\"\" |~ \"\\\"method\\\":\\\"POST\\\"\"[$__interval]))",
-          "legendFormat": "POST /tasks",
+          "expr": "sum(rate(task_lifecycle_api_http_requests_total{method=\"GET\", path=~\"/tasks|/tasks/:id|/tasks/:id/status\"}[$__rate_interval]))",
+          "legendFormat": "GET",
           "refId": "A"
         },
         {
-          "expr": "sum(count_over_time({container=\"api\"} |~ \"\\\"event\\\":\\\"api_http_request\\\"\" |~ \"\\\"path\\\":\\\"/tasks\\\"\" |~ \"\\\"method\\\":\\\"GET\\\"\"[$__interval]))",
-          "legendFormat": "GET /tasks",
+          "expr": "sum(rate(task_lifecycle_api_http_requests_total{method=\"POST\", path=\"/tasks\"}[$__rate_interval]))",
+          "legendFormat": "POST",
           "refId": "B"
         },
         {
-          "expr": "sum(count_over_time({container=\"api\"} |~ \"\\\"event\\\":\\\"api_http_request\\\"\" |~ \"\\\"path\\\":\\\"/tasks/:id/status\\\"\" |~ \"\\\"method\\\":\\\"PATCH\\\"\"[$__interval]))",
-          "legendFormat": "PATCH /tasks",
+          "expr": "sum(rate(task_lifecycle_api_http_requests_total{method=\"PATCH\", path=\"/tasks/:id/status\"}[$__rate_interval]))",
+          "legendFormat": "PATCH",
           "refId": "C"
+        },
+        {
+          "expr": "sum(rate(task_lifecycle_api_http_requests_total{method=\"DELETE\", path=\"/tasks/:id\"}[$__rate_interval]))",
+          "legendFormat": "DELETE",
+          "refId": "D"
         }
       ],
-      "title": "API Request Activity (from logs)",
+      "title": "API Throughput by Method",
       "type": "timeseries"
     },
     {
-      "datasource": "Loki",
+      "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
@@ -573,17 +578,22 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({container=\"api\"} |~ \"\\\"event\\\":\\\"api_http_request\\\"\" |~ \"\\\"status_code\\\":5[0-9]{2}\"[$__interval]))",
-          "legendFormat": "api errors",
+          "expr": "sum(rate(task_lifecycle_api_http_requests_total{status_class=\"4xx\"}[$__rate_interval]))",
+          "legendFormat": "HTTP 4xx",
           "refId": "A"
         },
         {
-          "expr": "sum(count_over_time({container=~\"worker|simulator\"} |~ \"\\\"result\\\":\\\"error\\\"|simulator_error|ERROR|Exception|Traceback\"[$__interval]))",
-          "legendFormat": "worker/simulator errors",
+          "expr": "sum(rate(task_lifecycle_api_http_requests_total{status_class=\"5xx\"}[$__rate_interval]))",
+          "legendFormat": "HTTP 5xx",
           "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(task_lifecycle_api_http_request_duration_seconds_bucket{path=~\"/tasks|/tasks/:id|/tasks/:id/status\"}[$__rate_interval])))",
+          "legendFormat": "p95 latency (s)",
+          "refId": "C"
         }
       ],
-      "title": "Error Rate (from logs)",
+      "title": "API Errors & Latency (p95)",
       "type": "timeseries"
     },
     {
@@ -603,11 +613,11 @@
       },
       "targets": [
         {
-          "expr": "{container=\"api\"} |~ \"\\\"event\\\":\\\"(api_http_request|task_created|task_status_updated)\\\"\"",
+          "expr": "{container=\"api\"} | json | event=~\"task_created|task_status_updated|task_deleted\" | line_format \"{{.ts}} | {{.event}} | task={{.task_id}} | status={{.status}}{{.to_status}} | actor={{.actor}} | title={{.title}}\"",
           "refId": "A"
         }
       ],
-      "title": "Live API Log Stream",
+      "title": "Task Lifecycle Events (clean stream)",
       "type": "logs"
     },
     {
@@ -627,11 +637,15 @@
       },
       "targets": [
         {
-          "expr": "{container=~\"worker|simulator\"} |~ \"\\\"event\\\":\\\"(worker_cycle|task_transition|worker_db_error|worker_invalid_env|worker_started|worker_loop_started|task_created|task_status_updated|simulator_error|wait|started)\\\"\"",
+          "expr": "{container=~\"worker|simulator\"} | json | event=~\"task_transition|task_created|task_status_updated|cleanup_done|simulator_error|worker_db_error|worker_invalid_env\" | line_format \"{{.ts}} | {{.component}} | {{.event}} | task={{.task_id}} | from={{.from_status}} | to={{.to_status}} | deleted={{.deleted}} | err={{.error}}\"",
           "refId": "A"
+        },
+        {
+          "expr": "{container=\"api\"} | json | event=\"api_http_request\" | method=~\"POST|PATCH|DELETE\" | line_format \"{{.ts}} | api_write | {{.method}} {{.raw_path}} | code={{.status_code}} | actor={{.actor}} | ms={{.duration_ms}}\"",
+          "refId": "B"
         }
       ],
-      "title": "Live Worker & Simulator Stream",
+      "title": "Write Actions + Worker/Simulator Diagnostics",
       "type": "logs"
     }
   ],
@@ -655,6 +669,6 @@
   "timezone": "",
   "title": "Application Lifecycle & Logs",
   "uid": "app-lifecycle-logs",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }
