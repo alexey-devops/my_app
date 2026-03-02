@@ -284,25 +284,19 @@ pipeline {
 
             docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
-              -v "$PWD/reports:/reports" \
-              -v "$PWD/.trivycache:/root/.cache" \
               "$TRIVY_IMAGE" image \
               --severity HIGH,CRITICAL \
               --format json \
-              --output "/reports/trivy-${SVC}.json" \
               --exit-code 0 \
-              "$IMAGE_REF"
+              "$IMAGE_REF" > "reports/trivy-${SVC}.json"
 
             docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
-              -v "$PWD/reports:/reports" \
-              -v "$PWD/.trivycache:/root/.cache" \
               "$TRIVY_IMAGE" image \
               --severity HIGH,CRITICAL \
               --format sarif \
-              --output "/reports/trivy-${SVC}.sarif" \
               --exit-code 0 \
-              "$IMAGE_REF"
+              "$IMAGE_REF" > "reports/trivy-${SVC}.sarif"
 
             if ! docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
