@@ -270,7 +270,7 @@ pipeline {
           FAILED=0
 
           for SVC in $SERVICES; do
-            IMAGE_ID="$(docker compose images -q "$SVC" | head -n1)"
+            IMAGE_ID="$(docker compose build --quiet "$SVC" | tail -n1 | tr -d '\r')"
             if [ -z "$IMAGE_ID" ]; then
               echo "No built image ID found for service: $SVC"
               FAILED=1
