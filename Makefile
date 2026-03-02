@@ -1,4 +1,4 @@
-.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo
+.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status
 
 # Default to .env if not specified
 ENV_FILE ?= .env
@@ -9,6 +9,8 @@ K8S_OVERLAY ?= k8s/overlays/dev
 KIND_TMPDIR ?= $(PWD)/.tmp-kind
 K8S_ROLLOUT ?= deployment/api
 K8S_ROLLOUT_TIMEOUT ?= 180s
+MONITORING_NAMESPACE ?= monitoring
+HELM ?= ./scripts/helm.sh
 
 all: up
 
@@ -134,3 +136,45 @@ k8s-rollout-status:
 k8s-rollout-undo:
 	@echo "Rolling back $(K8S_ROLLOUT) in namespace $(K8S_NAMESPACE)..."
 	kubectl rollout undo $(K8S_ROLLOUT) -n $(K8S_NAMESPACE)
+
+k8s-monitoring-install:
+	@echo "Installing kube-prometheus-stack, Loki and Promtail into namespace $(MONITORING_NAMESPACE)..."
+	kubectl create namespace $(MONITORING_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	$(HELM) repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	$(HELM) repo add grafana https://grafana.github.io/helm-charts
+	$(HELM) repo update
+	$(HELM) upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+		-n $(MONITORING_NAMESPACE) \
+		-f k8s/monitoring/kube-prometheus-stack-values.yaml
+	kubectl wait --for=condition=Established crd/servicemonitors.monitoring.coreos.com --timeout=180s
+	kubectl wait --for=condition=Established crd/prometheusrules.monitoring.coreos.com --timeout=180s
+	-$(HELM) uninstall loki -n $(MONITORING_NAMESPACE)
+	$(HELM) install loki grafana/loki \
+		-n $(MONITORING_NAMESPACE) \
+		-f k8s/monitoring/loki-values.yaml
+	$(HELM) upgrade --install promtail grafana/promtail \
+		-n $(MONITORING_NAMESPACE) \
+		-f k8s/monitoring/promtail-values.yaml
+	kubectl apply -f k8s/monitoring/servicemonitor-api.yaml
+	kubectl apply -f k8s/monitoring/servicemonitor-worker.yaml
+	kubectl apply -f k8s/monitoring/prometheusrule-app-alerts.yaml
+	kubectl apply -f k8s/monitoring/grafana-dashboard-application-lifecycle.yaml
+	@echo "Monitoring stack installed."
+
+k8s-monitoring-uninstall:
+	@echo "Uninstalling monitoring stack from namespace $(MONITORING_NAMESPACE)..."
+	-$(HELM) uninstall promtail -n $(MONITORING_NAMESPACE)
+	-$(HELM) uninstall loki -n $(MONITORING_NAMESPACE)
+	-$(HELM) uninstall kube-prometheus-stack -n $(MONITORING_NAMESPACE)
+	-kubectl delete -f k8s/monitoring/grafana-dashboard-application-lifecycle.yaml --ignore-not-found
+	-kubectl delete -f k8s/monitoring/prometheusrule-app-alerts.yaml --ignore-not-found
+	-kubectl delete -f k8s/monitoring/servicemonitor-worker.yaml --ignore-not-found
+	-kubectl delete -f k8s/monitoring/servicemonitor-api.yaml --ignore-not-found
+
+k8s-monitoring-status:
+	@echo "Monitoring namespace resources:"
+	kubectl get pods,svc,deploy,sts -n $(MONITORING_NAMESPACE)
+	@echo "ServiceMonitors in my-app namespace:"
+	kubectl get servicemonitors -n $(K8S_NAMESPACE)
+	@echo "PrometheusRules in my-app namespace:"
+	kubectl get prometheusrules -n $(K8S_NAMESPACE)

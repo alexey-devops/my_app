@@ -81,6 +81,40 @@ make k8s-status
 - `make k8s-rollout-status K8S_ROLLOUT=deployment/api` - дождаться завершения rollout
 - `make k8s-rollout-undo K8S_ROLLOUT=deployment/api` - откатить rollout
 
+### Kubernetes Observability (Prometheus + Grafana + Loki)
+
+1. Установить monitoring стек в namespace `monitoring`:
+```bash
+make k8s-monitoring-install
+```
+
+2. Проверить, что всё поднялось:
+```bash
+make k8s-monitoring-status
+```
+
+3. Открыть Grafana:
+```bash
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+```
+Логин по умолчанию: `admin`, пароль:
+```bash
+kubectl get secret -n monitoring kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
+
+4. В Grafana:
+- datasource `Prometheus` и `Loki` создаются автоматически;
+- дашборд `Application Lifecycle (K8s)` подхватывается через sidecar из ConfigMap.
+
+5. Проверка алертов:
+- `MyAppApiDown` - срабатывает при отсутствии Ready pod у `api` больше 1 минуты;
+- `MyAppFailedTasksGrowing` - срабатывает, если в системе есть задачи в статусе `failed` дольше 1 минуты.
+
+Тестовый триггер для `MyAppFailedTasksGrowing`:
+```bash
+curl -sS -X POST http://localhost:8088/api/tasks -H 'Content-Type: application/json' -d '{"title":"[FAIL] alert smoke test"}'
+```
+
 ### Rolling Update + Rollback demo (2–3 минуты)
 
 Сценарий для собеседования:
