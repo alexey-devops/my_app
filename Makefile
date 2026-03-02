@@ -1,4 +1,4 @@
-.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-main
+.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-main k8s-argocd-install k8s-argocd-status k8s-argocd-ui
 
 # Default to .env if not specified
 ENV_FILE ?= .env
@@ -11,6 +11,7 @@ K8S_ROLLOUT ?= deployment/api
 K8S_ROLLOUT_TIMEOUT ?= 180s
 MONITORING_NAMESPACE ?= monitoring
 HELM ?= ./scripts/helm.sh
+ARGOCD_NAMESPACE ?= argocd
 
 all: up
 
@@ -190,3 +191,27 @@ k8s-monitoring-status:
 	kubectl get servicemonitors -n $(K8S_NAMESPACE)
 	@echo "PrometheusRules in my-app namespace:"
 	kubectl get prometheusrules -n $(K8S_NAMESPACE)
+
+k8s-argocd-install:
+	@echo "Installing ArgoCD in namespace $(ARGOCD_NAMESPACE) and applying my-app Application..."
+	kubectl create namespace $(ARGOCD_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply --server-side --force-conflicts -n $(ARGOCD_NAMESPACE) -f k8s/argocd/install.yaml
+	-kubectl set image deployment/argocd-redis -n $(ARGOCD_NAMESPACE) redis=redis:7-alpine
+	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=180s
+	kubectl rollout status statefulset/argocd-application-controller -n $(ARGOCD_NAMESPACE) --timeout=600s
+	kubectl rollout status deployment/argocd-applicationset-controller -n $(ARGOCD_NAMESPACE) --timeout=600s
+	kubectl rollout status deployment/argocd-repo-server -n $(ARGOCD_NAMESPACE) --timeout=600s
+	kubectl rollout status deployment/argocd-server -n $(ARGOCD_NAMESPACE) --timeout=600s
+	-kubectl rollout status deployment/argocd-redis -n $(ARGOCD_NAMESPACE) --timeout=120s
+	kubectl apply -f k8s/argocd/application-my-app.yaml
+	@echo "ArgoCD installed and Application created."
+
+k8s-argocd-status:
+	@echo "ArgoCD resources in namespace $(ARGOCD_NAMESPACE):"
+	kubectl get pods,svc,deploy,statefulset -n $(ARGOCD_NAMESPACE)
+	@echo "ArgoCD applications:"
+	kubectl get applications.argoproj.io -n $(ARGOCD_NAMESPACE)
+
+k8s-argocd-ui:
+	@echo "Starting ArgoCD UI port-forward on http://localhost:8080 ..."
+	kubectl port-forward -n $(ARGOCD_NAMESPACE) svc/argocd-server 8080:443

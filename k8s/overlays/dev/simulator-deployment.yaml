@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: simulator
   namespace: my-app
+  labels:
+    app.kubernetes.io/component: dev-demo-tool
 spec:
   replicas: 1
   selector:

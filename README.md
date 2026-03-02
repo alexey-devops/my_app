@@ -52,7 +52,7 @@ make up
 
 Для постепенного перехода на K8s добавлен базовый контур в `k8s/`:
 - `k8s/base` - namespace, config/secret, postgres, api, worker, frontend, gateway.
-- `k8s/overlays/dev` - dev overlay через `kustomize`.
+- `k8s/overlays/dev` - dev overlay через `kustomize` (включая `simulator` как dev-only компонент).
 
 Пошагово:
 
@@ -134,30 +134,65 @@ kubectl get secret -n monitoring kube-prometheus-stack-grafana -o jsonpath='{.da
 curl -sS -X POST http://localhost:8088/api/tasks -H 'Content-Type: application/json' -d '{"title":"[FAIL] alert smoke test"}'
 ```
 
-### Rolling Update + Rollback demo (2–3 минуты)
+### GitOps with ArgoCD
+
+Установка ArgoCD и регистрация приложения:
+
+```bash
+make k8s-argocd-install
+```
+
+Проверка статуса:
+
+```bash
+make k8s-argocd-status
+```
+
+Открыть UI ArgoCD:
+
+```bash
+make k8s-argocd-ui
+```
+
+Короткий demo GitOps:
+
+1. Меняешь любой манифест в `k8s/overlays/dev` (например replicas/image tag), коммитишь и пушишь.
+2. ArgoCD автоматически синхронизирует изменения в кластер (`prune: true`, `selfHeal: true`).
+3. Для демонстрации drift: вручную изменяешь объект в кластере (`kubectl scale ...`) и видишь, как Argo возвращает состояние к Git.
+
+### Release demo (GitOps rollout + rollback за 2 минуты)
+
+В `dev` overlay для `api` и `gateway` включён zero-downtime rollout-паттерн:
+
+- `replicas: 2`
+- `strategy.type: RollingUpdate`
+- `maxUnavailable: 0`
+- `maxSurge: 1`
+- `PodDisruptionBudget minAvailable: 1`
 
 Сценарий для собеседования:
 
-1. Вызвать rollout без смены образа (через env timestamp):
-```bash
-kubectl set env deployment/api -n my-app ROLLOUT_TS=$(date +%s)
-```
+1. Меняешь release-настройку в Git (например `image tag` или любой env в манифесте `k8s/overlays/dev`) и делаешь commit + push.
 
-2. Следить за rollout:
+2. В ArgoCD видно auto-sync и rollout:
 ```bash
+make k8s-argocd-status
 make k8s-rollout-status K8S_ROLLOUT=deployment/api
 ```
 
-3. Во время обновления проверить доступность:
+3. Во время обновления проверяешь API:
 ```bash
-for i in {1..15}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8088/api/health; sleep 1; done
+for i in {1..20}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8088/api/health; sleep 1; done
 ```
 
-4. Откатить деплой:
+4. Rollback делается только через Git:
 ```bash
-make k8s-rollout-undo K8S_ROLLOUT=deployment/api
+git revert <commit_sha>
+git push
 make k8s-rollout-status K8S_ROLLOUT=deployment/api
 ```
+
+ArgoCD автоматически применит откат и вернёт кластер к состоянию из Git.
 
 ## Demo Mode (для собеседования)
 

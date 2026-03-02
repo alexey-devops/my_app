@@ -2,6 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base
+  - simulator-deployment.yaml
 namespace: my-app
 images:
   - name: my-app/api
@@ -13,6 +14,7 @@ images:
   - name: my-app/simulator
     newTag: dev
 patches:
+  - path: configmap-dev-patch.yaml
   - path: gateway-service-nodeport-patch.yaml
   - path: deployments-dev-patch.yaml
   - path: postgres-dev-patch.yaml

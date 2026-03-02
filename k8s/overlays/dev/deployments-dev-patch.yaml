@@ -4,7 +4,7 @@ metadata:
   name: api
   namespace: my-app
 spec:
-  replicas: 1
+  replicas: 2
   template:
     spec:
       containers:
@@ -42,7 +42,7 @@ metadata:
   name: frontend
   namespace: my-app
 spec:
-  replicas: 1
+  replicas: 2
   template:
     spec:
       containers:
@@ -61,7 +61,7 @@ metadata:
   name: gateway
   namespace: my-app
 spec:
-  replicas: 1
+  replicas: 2
   template:
     spec:
       containers:
