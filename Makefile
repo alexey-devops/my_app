@@ -92,7 +92,7 @@ k8s-grafana-ui:
 		kill $$PID >/dev/null 2>&1 || true; \
 		rm -f /tmp/grafana-port-forward.pid; \
 	fi
-	@nohup kubectl port-forward -n $(MONITORING_NAMESPACE) svc/kube-prometheus-stack-grafana $(GRAFANA_UI_PORT):80 >/tmp/grafana-port-forward.log 2>&1 & echo $$! >/tmp/grafana-port-forward.pid
+	@nohup kubectl port-forward --address 0.0.0.0 -n $(MONITORING_NAMESPACE) svc/kube-prometheus-stack-grafana $(GRAFANA_UI_PORT):80 >/tmp/grafana-port-forward.log 2>&1 & echo $$! >/tmp/grafana-port-forward.pid
 	@echo "Grafana is available on http://localhost:$(GRAFANA_UI_PORT)"
 	@echo "Logs: /tmp/grafana-port-forward.log"
 
