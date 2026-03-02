@@ -6,6 +6,8 @@ from typing import Literal, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.responses import Response
 
@@ -159,6 +161,18 @@ async def read_root():
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def readiness_check(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except (SQLAlchemyError, RuntimeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database is not ready: {exc}",
+        ) from exc
+    return {"status": "ready"}
 
 
 @app.get("/metrics")

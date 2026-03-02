@@ -13,6 +13,61 @@ spec:
       labels:
         app: worker
     spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:13-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: POSTGRES_PORT
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
+                echo "waiting for postgres...";
+                sleep 2;
+              done
+        - name: wait-redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_PORT
+          command:
+            - sh
+            - -c
+            - |
+              until redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" ping | grep -q PONG; do
+                echo "waiting for redis...";
+                sleep 2;
+              done
       containers:
         - name: worker
           image: my-app/worker:dev
@@ -40,6 +95,16 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: POSTGRES_PORT
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: REDIS_PORT
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -71,12 +136,12 @@ spec:
                   name: app-config
                   key: WORKER_LOOP_SLEEP_SECONDS
           livenessProbe:
-            exec:
-              command: ["python", "healthcheck.py"]
+            tcpSocket:
+              port: 9102
             initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
+            timeoutSeconds: 3
+            failureThreshold: 3
           readinessProbe:
             exec:
               command: ["python", "healthcheck.py"]

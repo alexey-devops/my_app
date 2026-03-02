@@ -6,6 +6,8 @@ resources:
   - secret.example.yaml
   - postgres-deployment.yaml
   - postgres-service.yaml
+  - redis-deployment.yaml
+  - redis-service.yaml
   - api-deployment.yaml
   - api-service.yaml
   - worker-deployment.yaml
