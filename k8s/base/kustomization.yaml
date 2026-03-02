@@ -4,9 +4,9 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - secret.example.yaml
-  - postgres-deployment.yaml
+  - postgres-statefulset.yaml
   - postgres-service.yaml
-  - redis-deployment.yaml
+  - redis-statefulset.yaml
   - redis-service.yaml
   - api-deployment.yaml
   - api-service.yaml

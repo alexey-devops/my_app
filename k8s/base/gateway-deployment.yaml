@@ -30,16 +30,23 @@ spec:
               subPath: nginx.conf
           livenessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 8080
             initialDelaySeconds: 8
             periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
       volumes:
         - name: nginx-config
           configMap:

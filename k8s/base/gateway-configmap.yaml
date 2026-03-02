@@ -29,6 +29,11 @@ data:
       server {
         listen 8080;
 
+        location = /healthz {
+          default_type text/plain;
+          return 200 'ok';
+        }
+
         location /api/ {
           rewrite ^/api/(.*)$ /$1 break;
           proxy_pass http://api_upstream;

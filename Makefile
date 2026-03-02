@@ -171,7 +171,6 @@ k8s-monitoring-install:
 	kubectl apply -f k8s/monitoring/servicemonitor-worker.yaml
 	kubectl apply -f k8s/monitoring/prometheusrule-app-alerts.yaml
 	kubectl apply -f k8s/monitoring/grafana-dashboard-application-lifecycle.yaml
-	kubectl apply -f k8s/monitoring/grafana-nodeport-service.yaml
 	@echo "Monitoring stack installed."
 
 k8s-monitoring-uninstall:
@@ -180,7 +179,6 @@ k8s-monitoring-uninstall:
 	-$(HELM) uninstall loki -n $(MONITORING_NAMESPACE)
 	-$(HELM) uninstall kube-prometheus-stack -n $(MONITORING_NAMESPACE)
 	-kubectl delete -f k8s/monitoring/grafana-dashboard-application-lifecycle.yaml --ignore-not-found
-	-kubectl delete -f k8s/monitoring/grafana-nodeport-service.yaml --ignore-not-found
 	-kubectl delete -f k8s/monitoring/prometheusrule-app-alerts.yaml --ignore-not-found
 	-kubectl delete -f k8s/monitoring/servicemonitor-worker.yaml --ignore-not-found
 	-kubectl delete -f k8s/monitoring/servicemonitor-api.yaml --ignore-not-found

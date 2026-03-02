@@ -4,8 +4,6 @@ metadata:
   name: app-config
   namespace: my-app
 data:
-  POSTGRES_DB: tasks_db
-  POSTGRES_USER: user
   POSTGRES_HOST: postgres
   POSTGRES_PORT: "5432"
   REDIS_HOST: redis

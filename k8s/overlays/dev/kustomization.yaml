@@ -12,3 +12,8 @@ images:
     newTag: dev
   - name: my-app/simulator
     newTag: dev
+patches:
+  - path: gateway-service-nodeport-patch.yaml
+  - path: deployments-dev-patch.yaml
+  - path: postgres-dev-patch.yaml
+  - path: redis-dev-patch.yaml

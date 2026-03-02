@@ -92,7 +92,7 @@ make k8s-main
 
 После этого:
 - приложение: `http://localhost:8088`
-- Grafana (k8s): `http://localhost:3000`
+- Grafana (k8s): `kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80`
 - Jenkins (опционально, отдельный контур CI): поднимается только если нужен `make up`
 
 В k8s включен тот же demo-паттерн, что и в compose:
@@ -113,7 +113,9 @@ make k8s-monitoring-status
 ```
 
 3. Открыть Grafana:
-- `http://localhost:3000` (через `grafana-nodeport`)
+```bash
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+```
 - Логин по умолчанию: `admin`, пароль:
 ```bash
 kubectl get secret -n monitoring kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
