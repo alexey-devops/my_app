@@ -255,6 +255,7 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
+          export DOCKER_BUILDKIT=0
           IMAGE_TAG="ci-${BUILD_NUMBER:-local}"
           docker build -t "my-app/api:${IMAGE_TAG}" ./api
           docker build -t "my-app/worker:${IMAGE_TAG}" ./worker
