@@ -10,6 +10,7 @@ resources:
   - redis-service.yaml
   - api-deployment.yaml
   - api-service.yaml
+  - api-pdb.yaml
   - worker-deployment.yaml
   - worker-service.yaml
   - frontend-deployment.yaml
@@ -17,3 +18,4 @@ resources:
   - gateway-configmap.yaml
   - gateway-deployment.yaml
   - gateway-service.yaml
+  - gateway-pdb.yaml

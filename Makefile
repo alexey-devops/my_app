@@ -1,4 +1,4 @@
-.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap
+.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo
 
 # Default to .env if not specified
 ENV_FILE ?= .env
@@ -7,6 +7,8 @@ KIND_CLUSTER_NAME ?= my-app-kind
 K8S_NAMESPACE ?= my-app
 K8S_OVERLAY ?= k8s/overlays/dev
 KIND_TMPDIR ?= $(PWD)/.tmp-kind
+K8S_ROLLOUT ?= deployment/api
+K8S_ROLLOUT_TIMEOUT ?= 180s
 
 all: up
 
@@ -124,3 +126,11 @@ k8s-status:
 
 k8s-bootstrap: k8s-kind-create k8s-build-images k8s-load-images k8s-apply k8s-status
 	@echo "kind bootstrap completed. App gateway is exposed on http://localhost:8088"
+
+k8s-rollout-status:
+	@echo "Waiting rollout status for $(K8S_ROLLOUT) in namespace $(K8S_NAMESPACE)..."
+	kubectl rollout status $(K8S_ROLLOUT) -n $(K8S_NAMESPACE) --timeout=$(K8S_ROLLOUT_TIMEOUT)
+
+k8s-rollout-undo:
+	@echo "Rolling back $(K8S_ROLLOUT) in namespace $(K8S_NAMESPACE)..."
+	kubectl rollout undo $(K8S_ROLLOUT) -n $(K8S_NAMESPACE)

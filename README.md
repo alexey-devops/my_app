@@ -78,6 +78,33 @@ make k8s-status
 - `make k8s-apply` - повторно применить манифесты
 - `make k8s-delete` - удалить манифесты из кластера
 - `make k8s-kind-delete` - удалить kind-кластер
+- `make k8s-rollout-status K8S_ROLLOUT=deployment/api` - дождаться завершения rollout
+- `make k8s-rollout-undo K8S_ROLLOUT=deployment/api` - откатить rollout
+
+### Rolling Update + Rollback demo (2–3 минуты)
+
+Сценарий для собеседования:
+
+1. Вызвать rollout без смены образа (через env timestamp):
+```bash
+kubectl set env deployment/api -n my-app ROLLOUT_TS=$(date +%s)
+```
+
+2. Следить за rollout:
+```bash
+make k8s-rollout-status K8S_ROLLOUT=deployment/api
+```
+
+3. Во время обновления проверить доступность:
+```bash
+for i in {1..15}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8088/api/health; sleep 1; done
+```
+
+4. Откатить деплой:
+```bash
+make k8s-rollout-undo K8S_ROLLOUT=deployment/api
+make k8s-rollout-status K8S_ROLLOUT=deployment/api
+```
 
 ## Demo Mode (для собеседования)
 
