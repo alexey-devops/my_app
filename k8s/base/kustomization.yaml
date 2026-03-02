@@ -13,6 +13,7 @@ resources:
   - api-pdb.yaml
   - worker-deployment.yaml
   - worker-service.yaml
+  - simulator-deployment.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
   - gateway-configmap.yaml

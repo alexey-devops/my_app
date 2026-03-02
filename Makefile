@@ -1,4 +1,4 @@
-.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status
+.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-main
 
 # Default to .env if not specified
 ENV_FILE ?= .env
@@ -106,6 +106,7 @@ k8s-build-images:
 	docker build -t my-app/api:dev ./api
 	docker build -t my-app/worker:dev ./worker
 	docker build -t my-app/frontend:dev ./frontend
+	docker build -t my-app/simulator:dev ./simulator
 
 k8s-load-images:
 	@echo "Loading images into kind cluster $(KIND_CLUSTER_NAME)..."
@@ -113,6 +114,7 @@ k8s-load-images:
 	TMPDIR=$(KIND_TMPDIR) kind load docker-image my-app/api:dev --name $(KIND_CLUSTER_NAME)
 	TMPDIR=$(KIND_TMPDIR) kind load docker-image my-app/worker:dev --name $(KIND_CLUSTER_NAME)
 	TMPDIR=$(KIND_TMPDIR) kind load docker-image my-app/frontend:dev --name $(KIND_CLUSTER_NAME)
+	TMPDIR=$(KIND_TMPDIR) kind load docker-image my-app/simulator:dev --name $(KIND_CLUSTER_NAME)
 
 k8s-apply:
 	@echo "Applying Kubernetes manifests from $(K8S_OVERLAY)..."
@@ -137,6 +139,16 @@ k8s-rollout-undo:
 	@echo "Rolling back $(K8S_ROLLOUT) in namespace $(K8S_NAMESPACE)..."
 	kubectl rollout undo $(K8S_ROLLOUT) -n $(K8S_NAMESPACE)
 
+k8s-main:
+	@echo "Switching to single-source mode: Kubernetes only (compose will be stopped)..."
+	$(MAKE) down
+	$(MAKE) k8s-build-images
+	$(MAKE) k8s-load-images
+	$(MAKE) k8s-apply
+	$(MAKE) k8s-monitoring-install
+	$(MAKE) k8s-status
+	@echo "Main app URL: http://localhost:8088"
+
 k8s-monitoring-install:
 	@echo "Installing kube-prometheus-stack, Loki and Promtail into namespace $(MONITORING_NAMESPACE)..."
 	kubectl create namespace $(MONITORING_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
@@ -159,6 +171,7 @@ k8s-monitoring-install:
 	kubectl apply -f k8s/monitoring/servicemonitor-worker.yaml
 	kubectl apply -f k8s/monitoring/prometheusrule-app-alerts.yaml
 	kubectl apply -f k8s/monitoring/grafana-dashboard-application-lifecycle.yaml
+	kubectl apply -f k8s/monitoring/grafana-nodeport-service.yaml
 	@echo "Monitoring stack installed."
 
 k8s-monitoring-uninstall:
@@ -167,6 +180,7 @@ k8s-monitoring-uninstall:
 	-$(HELM) uninstall loki -n $(MONITORING_NAMESPACE)
 	-$(HELM) uninstall kube-prometheus-stack -n $(MONITORING_NAMESPACE)
 	-kubectl delete -f k8s/monitoring/grafana-dashboard-application-lifecycle.yaml --ignore-not-found
+	-kubectl delete -f k8s/monitoring/grafana-nodeport-service.yaml --ignore-not-found
 	-kubectl delete -f k8s/monitoring/prometheusrule-app-alerts.yaml --ignore-not-found
 	-kubectl delete -f k8s/monitoring/servicemonitor-worker.yaml --ignore-not-found
 	-kubectl delete -f k8s/monitoring/servicemonitor-api.yaml --ignore-not-found

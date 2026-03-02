@@ -80,6 +80,25 @@ make k8s-status
 - `make k8s-kind-delete` - удалить kind-кластер
 - `make k8s-rollout-status K8S_ROLLOUT=deployment/api` - дождаться завершения rollout
 - `make k8s-rollout-undo K8S_ROLLOUT=deployment/api` - откатить rollout
+- `make k8s-main` - перевести проект в режим "одно основное приложение на k8s" (останавливает compose, применяет k8s и monitoring)
+
+### One Main Environment (K8s)
+
+Чтобы не было рассинхронизации между compose и k8s, используй только k8s как основной контур:
+
+```bash
+make k8s-main
+```
+
+После этого:
+- приложение: `http://localhost:8088`
+- Grafana (k8s): `http://localhost:3000`
+- Jenkins (опционально, отдельный контур CI): поднимается только если нужен `make up`
+
+В k8s включен тот же demo-паттерн, что и в compose:
+- `simulator` создаёт задачи и двигает их по статусам с задержками
+- `worker` не перехватывает pending автоматически (`WORKER_AUTOPROCESS_ENABLED=0`)
+- метрики API/worker и логи идут в Prometheus/Loki/Grafana
 
 ### Kubernetes Observability (Prometheus + Grafana + Loki)
 
@@ -94,10 +113,8 @@ make k8s-monitoring-status
 ```
 
 3. Открыть Grafana:
-```bash
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
-```
-Логин по умолчанию: `admin`, пароль:
+- `http://localhost:3000` (через `grafana-nodeport`)
+- Логин по умолчанию: `admin`, пароль:
 ```bash
 kubectl get secret -n monitoring kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
