@@ -255,7 +255,10 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
-          docker compose build api worker frontend
+          IMAGE_TAG="ci-${BUILD_NUMBER:-local}"
+          docker build -t "my-app/api:${IMAGE_TAG}" ./api
+          docker build -t "my-app/worker:${IMAGE_TAG}" ./worker
+          docker build -t "my-app/frontend:${IMAGE_TAG}" ./frontend
         '''
       }
     }
@@ -266,13 +269,14 @@ pipeline {
           set -euxo pipefail
           mkdir -p reports/trivy .trivycache
           TRIVY_IMAGE="aquasec/trivy:0.58.1"
+          IMAGE_TAG="ci-${BUILD_NUMBER:-local}"
           SERVICES="api worker frontend"
           FAILED=0
 
           for SVC in $SERVICES; do
-            IMAGE_ID="$(docker compose build --quiet "$SVC" | tail -n1 | tr -d '\r')"
-            if [ -z "$IMAGE_ID" ]; then
-              echo "No built image ID found for service: $SVC"
+            IMAGE_REF="my-app/${SVC}:${IMAGE_TAG}"
+            if ! docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
+              echo "Built image not found: $IMAGE_REF"
               FAILED=1
               continue
             fi
@@ -286,7 +290,7 @@ pipeline {
               --format json \
               --output "/reports/trivy-${SVC}.json" \
               --exit-code 0 \
-              "$IMAGE_ID"
+              "$IMAGE_REF"
 
             docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
@@ -297,7 +301,7 @@ pipeline {
               --format sarif \
               --output "/reports/trivy-${SVC}.sarif" \
               --exit-code 0 \
-              "$IMAGE_ID"
+              "$IMAGE_REF"
 
             if ! docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
@@ -305,7 +309,7 @@ pipeline {
               "$TRIVY_IMAGE" image \
               --severity HIGH,CRITICAL \
               --exit-code 1 \
-              "$IMAGE_ID" > "reports/trivy-${SVC}.txt"; then
+              "$IMAGE_REF" > "reports/trivy-${SVC}.txt"; then
               echo "Trivy gate failed for $SVC (HIGH/CRITICAL found)"
               FAILED=1
             fi
