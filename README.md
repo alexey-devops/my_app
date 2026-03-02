@@ -35,7 +35,7 @@ echo "<postgres-password>" > secrets/postgres_password.txt
 echo "<grafana-password>" > secrets/grafana_admin_password.txt
 ```
 
-3. Поднять сервисы:
+3. Поднять сервисы (single-runtime: одно приложение в Kubernetes + Jenkins + Grafana):
 
 ```bash
 make up
@@ -43,10 +43,10 @@ make up
 
 4. Проверить:
 
-- UI: `https://localhost:8443/`
-- API: `https://localhost:8443/api/health`
-- Grafana: `https://localhost:8443/grafana/`
-- Prometheus: `https://localhost:8443/prometheus/`
+- UI: `http://localhost:8088/`
+- API: `http://localhost:8088/api/health`
+- Jenkins: `http://localhost:8081`
+- Grafana: `http://localhost:3000`
 
 ## Kubernetes (kind) Quick Start
 
@@ -87,13 +87,14 @@ make k8s-status
 Чтобы не было рассинхронизации между compose и k8s, используй только k8s как основной контур:
 
 ```bash
-make k8s-main
+make up
 ```
 
 После этого:
 - приложение: `http://localhost:8088`
-- Grafana (k8s): `kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80`
-- Jenkins (опционально, отдельный контур CI): поднимается только если нужен `make up`
+- Grafana (k8s): `http://localhost:3000`
+- Jenkins (compose, отдельный CI-контур): `http://localhost:8081`
+- legacy compose app-стек отключен по умолчанию, чтобы не было дубляжа задач и БД.
 
 В k8s включен тот же demo-паттерн, что и в compose:
 - `simulator` создаёт задачи и двигает их по статусам с задержками
@@ -249,6 +250,7 @@ Pipeline стадии:
 3. `Validate Compose`
 4. `Autotests`
 5. `Build Docker Images`
+6. `Security Scan (Trivy)` - скан образов `api/worker/frontend`, build падает при `HIGH/CRITICAL`, отчёты сохраняются как артефакты (`reports/trivy-*.json`, `reports/trivy-*.sarif`).
 
 Подробная настройка:
 
@@ -257,6 +259,18 @@ Pipeline стадии:
 - [DEVOPS.md](DEVOPS.md)
 
 Для "только после CI в main": включи branch protection на `main` и обязательный status check `ci/jenkins` (см. `JENKINS.md`).
+
+## K8s Security Hardening
+
+- Для `api/worker/gateway` добавлен container `securityContext`:
+  - `runAsNonRoot: true`
+  - `allowPrivilegeEscalation: false`
+  - `capabilities.drop: ["ALL"]`
+  - `readOnlyRootFilesystem: true` (с `emptyDir` для runtime tmp/cache)
+- Добавлены `NetworkPolicy` с моделью deny-by-default:
+  - базовый `default-deny-all`
+  - разрешения только для нужных связей (`gateway->frontend/api`, `api/worker->postgres/redis`, scrape из `monitoring`)
+  - отдельное правило на DNS egress к `kube-dns`
 
 ## Структура статусов API
 

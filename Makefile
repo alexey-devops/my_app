@@ -1,4 +1,4 @@
-.PHONY: build up down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-main k8s-argocd-install k8s-argocd-status k8s-argocd-ui
+.PHONY: build up down compose-up compose-down app-compose-up app-compose-down jenkins-up jenkins-down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-grafana-ui k8s-grafana-ui-stop k8s-main k8s-argocd-install k8s-argocd-status k8s-argocd-ui k8s-argocd-ui-stop
 
 # Default to .env if not specified
 ENV_FILE ?= .env
@@ -12,6 +12,9 @@ K8S_ROLLOUT_TIMEOUT ?= 180s
 MONITORING_NAMESPACE ?= monitoring
 HELM ?= ./scripts/helm.sh
 ARGOCD_NAMESPACE ?= argocd
+ARGOCD_UI_PORT ?= 8090
+GRAFANA_UI_PORT ?= 3000
+ALLOW_COMPOSE ?= 0
 
 all: up
 
@@ -21,14 +24,87 @@ build:
 	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml build
 
 up:
-	@echo "Bringing up Docker Compose stack (including Jenkins)..."
+	@echo "Starting single-runtime mode: Kubernetes app + monitoring + ArgoCD + Jenkins..."
+	-$(MAKE) app-compose-down
+	@if ! kind get clusters | grep -qx "$(KIND_CLUSTER_NAME)"; then \
+		$(MAKE) k8s-kind-create; \
+	fi
+	$(MAKE) k8s-build-images
+	$(MAKE) k8s-load-images
+	$(MAKE) k8s-apply
+	$(MAKE) k8s-monitoring-install
+	$(MAKE) k8s-grafana-ui
+	$(MAKE) k8s-argocd-install
+	$(MAKE) jenkins-up
+	$(MAKE) k8s-status
+	@echo "App URL: http://localhost:8088"
+	@echo "Grafana URL: http://localhost:$(GRAFANA_UI_PORT)"
+	@echo "Jenkins URL: http://localhost:8081"
+
+compose-up:
+	@if [ "$(ALLOW_COMPOSE)" != "1" ]; then \
+		echo "Compose runtime is disabled to prevent duplicate app stacks."; \
+		echo "If you really need legacy compose app stack: make app-compose-up ALLOW_COMPOSE=1"; \
+		exit 1; \
+	fi
+	@echo "Bringing up legacy full Docker Compose stack (manual override)..."
+	$(MAKE) app-compose-up ALLOW_COMPOSE=1
+	$(MAKE) jenkins-up
+
+app-compose-up:
+	@if [ "$(ALLOW_COMPOSE)" != "1" ]; then \
+		echo "Legacy compose app stack is disabled to prevent duplicate app stacks."; \
+		echo "If you really need it: make app-compose-up ALLOW_COMPOSE=1"; \
+		exit 1; \
+	fi
+	@echo "Bringing up legacy app Docker Compose stack..."
 	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) up -d --remove-orphans
-	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml --env-file $(ENV_FILE) up -d --build
 
 down:
-	@echo "Bringing down Docker Compose stack (including Jenkins)..."
-	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml --env-file $(ENV_FILE) down -v
+	@echo "Stopping Jenkins and UI forwards..."
+	$(MAKE) k8s-grafana-ui-stop
+	$(MAKE) k8s-argocd-ui-stop
+	$(MAKE) jenkins-down
+	@echo "Stopping legacy app Docker Compose stack (if any)..."
+	$(MAKE) app-compose-down
+
+compose-down:
+	@echo "Stopping all compose services (app + jenkins)..."
+	$(MAKE) jenkins-down
+	$(MAKE) app-compose-down
+
+app-compose-down:
+	@echo "Bringing down legacy app Docker Compose stack..."
 	$(DOCKER_COMPOSE) -f docker-compose.yml --env-file $(ENV_FILE) down -v
+
+jenkins-up:
+	@echo "Starting Jenkins container..."
+	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml --env-file $(ENV_FILE) up -d --build
+
+jenkins-down:
+	@echo "Stopping Jenkins container..."
+	$(DOCKER_COMPOSE) -f docker-compose.jenkins.yml --env-file $(ENV_FILE) down -v
+
+k8s-grafana-ui:
+	@echo "Starting Grafana port-forward in background on http://localhost:$(GRAFANA_UI_PORT) ..."
+	@if [ -f /tmp/grafana-port-forward.pid ]; then \
+		PID=$$(cat /tmp/grafana-port-forward.pid); \
+		kill $$PID >/dev/null 2>&1 || true; \
+		rm -f /tmp/grafana-port-forward.pid; \
+	fi
+	@nohup kubectl port-forward -n $(MONITORING_NAMESPACE) svc/kube-prometheus-stack-grafana $(GRAFANA_UI_PORT):80 >/tmp/grafana-port-forward.log 2>&1 & echo $$! >/tmp/grafana-port-forward.pid
+	@echo "Grafana is available on http://localhost:$(GRAFANA_UI_PORT)"
+	@echo "Logs: /tmp/grafana-port-forward.log"
+
+k8s-grafana-ui-stop:
+	@echo "Stopping Grafana port-forward on $(GRAFANA_UI_PORT)..."
+	@if [ -f /tmp/grafana-port-forward.pid ]; then \
+		PID=$$(cat /tmp/grafana-port-forward.pid); \
+		kill $$PID >/dev/null 2>&1 || true; \
+		rm -f /tmp/grafana-port-forward.pid; \
+	else \
+		echo "No running Grafana port-forward pid file found."; \
+	fi
 
 test:
 	@echo "Running Python tests in isolated Python 3.10 container..."
@@ -213,5 +289,22 @@ k8s-argocd-status:
 	kubectl get applications.argoproj.io -n $(ARGOCD_NAMESPACE)
 
 k8s-argocd-ui:
-	@echo "Starting ArgoCD UI port-forward on http://localhost:8080 ..."
-	kubectl port-forward -n $(ARGOCD_NAMESPACE) svc/argocd-server 8080:443
+	@echo "Starting ArgoCD UI port-forward in background on http://localhost:$(ARGOCD_UI_PORT) ..."
+	@if [ -f /tmp/argocd-port-forward.pid ]; then \
+		PID=$$(cat /tmp/argocd-port-forward.pid); \
+		kill $$PID >/dev/null 2>&1 || true; \
+		rm -f /tmp/argocd-port-forward.pid; \
+	fi
+	@nohup kubectl port-forward -n $(ARGOCD_NAMESPACE) svc/argocd-server $(ARGOCD_UI_PORT):443 >/tmp/argocd-port-forward.log 2>&1 & echo $$! >/tmp/argocd-port-forward.pid
+	@echo "ArgoCD UI is available on http://localhost:$(ARGOCD_UI_PORT)"
+	@echo "Logs: /tmp/argocd-port-forward.log"
+
+k8s-argocd-ui-stop:
+	@echo "Stopping ArgoCD UI port-forward on $(ARGOCD_UI_PORT)..."
+	@if [ -f /tmp/argocd-port-forward.pid ]; then \
+		PID=$$(cat /tmp/argocd-port-forward.pid); \
+		kill $$PID >/dev/null 2>&1 || true; \
+		rm -f /tmp/argocd-port-forward.pid; \
+	else \
+		echo "No running ArgoCD port-forward pid file found."; \
+	fi

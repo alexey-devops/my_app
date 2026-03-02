@@ -19,3 +19,12 @@ resources:
   - gateway-deployment.yaml
   - gateway-service.yaml
   - gateway-pdb.yaml
+  - networkpolicy-default-deny.yaml
+  - networkpolicy-allow-dns.yaml
+  - networkpolicy-gateway.yaml
+  - networkpolicy-api.yaml
+  - networkpolicy-worker.yaml
+  - networkpolicy-frontend.yaml
+  - networkpolicy-postgres.yaml
+  - networkpolicy-redis.yaml
+  - networkpolicy-simulator.yaml

@@ -77,9 +77,22 @@ spec:
         - name: worker
           image: my-app/worker:dev
           imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 9102
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: TMPDIR
+              value: /tmp
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
@@ -161,3 +174,6 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}

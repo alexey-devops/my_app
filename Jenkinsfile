@@ -259,6 +259,62 @@ pipeline {
         '''
       }
     }
+
+    stage('Security Scan (Trivy)') {
+      steps {
+        sh '''
+          set -euxo pipefail
+          mkdir -p reports/trivy .trivycache
+          TRIVY_IMAGE="aquasec/trivy:0.58.1"
+          SERVICES="api worker frontend"
+          FAILED=0
+
+          for SVC in $SERVICES; do
+            IMAGE_ID="$(docker compose images -q "$SVC" | head -n1)"
+            if [ -z "$IMAGE_ID" ]; then
+              echo "No built image ID found for service: $SVC"
+              FAILED=1
+              continue
+            fi
+
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/reports:/reports" \
+              -v "$PWD/.trivycache:/root/.cache" \
+              "$TRIVY_IMAGE" image \
+              --severity HIGH,CRITICAL \
+              --format json \
+              --output "/reports/trivy-${SVC}.json" \
+              --exit-code 0 \
+              "$IMAGE_ID"
+
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/reports:/reports" \
+              -v "$PWD/.trivycache:/root/.cache" \
+              "$TRIVY_IMAGE" image \
+              --severity HIGH,CRITICAL \
+              --format sarif \
+              --output "/reports/trivy-${SVC}.sarif" \
+              --exit-code 0 \
+              "$IMAGE_ID"
+
+            if ! docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/.trivycache:/root/.cache" \
+              "$TRIVY_IMAGE" image \
+              --severity HIGH,CRITICAL \
+              --exit-code 1 \
+              "$IMAGE_ID" > "reports/trivy-${SVC}.txt"; then
+              echo "Trivy gate failed for $SVC (HIGH/CRITICAL found)"
+              FAILED=1
+            fi
+          done
+
+          test "$FAILED" -eq 0
+        '''
+      }
+    }
   }
 
   post {
@@ -287,7 +343,7 @@ pipeline {
       }
     }
     always {
-      archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
+      archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
       deleteDir()
     }
   }
