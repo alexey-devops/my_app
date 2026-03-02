@@ -214,9 +214,11 @@ def main() -> None:
             update_status(session, base_url, task_id, "in_progress", actor)
 
             maybe_sleep_with_log(stage_min, stage_max, "before_final_status")
-            # Tagged [FAIL] tasks fail more often to keep demos visually rich.
-            effective_fail_rate = max(fail_rate, 0.7) if tagged_fail else fail_rate
-            final_status = "failed" if random.random() < effective_fail_rate else "done"
+            # Tagged [FAIL] tasks must always end in failed for deterministic demo behavior.
+            if tagged_fail:
+                final_status = "failed"
+            else:
+                final_status = "failed" if random.random() < fail_rate else "done"
             update_status(session, base_url, task_id, final_status, actor)
         except Exception as exc:
             log_event(
