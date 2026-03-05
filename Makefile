@@ -273,10 +273,12 @@ k8s-argocd-install:
 	kubectl create namespace $(ARGOCD_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply --server-side --force-conflicts -n $(ARGOCD_NAMESPACE) -f k8s/argocd/install.yaml
 	-kubectl set image deployment/argocd-redis -n $(ARGOCD_NAMESPACE) redis=redis:7-alpine
+	# Work around repo-server initContainer copyutil CrashLoop in some kind/containerd combinations.
+	-kubectl patch deployment argocd-repo-server -n $(ARGOCD_NAMESPACE) --type json -p='[{"op":"replace","path":"/spec/template/spec/initContainers/0/args","value":["cp -f /usr/local/bin/argocd /var/run/argocd/argocd && ln -sf /var/run/argocd/argocd /var/run/argocd/argocd-cmp-server"]}]'
 	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=180s
 	kubectl rollout status statefulset/argocd-application-controller -n $(ARGOCD_NAMESPACE) --timeout=600s
 	kubectl rollout status deployment/argocd-applicationset-controller -n $(ARGOCD_NAMESPACE) --timeout=600s
-	kubectl rollout status deployment/argocd-repo-server -n $(ARGOCD_NAMESPACE) --timeout=600s
+	kubectl rollout status deployment/argocd-repo-server -n $(ARGOCD_NAMESPACE) --timeout=240s
 	kubectl rollout status deployment/argocd-server -n $(ARGOCD_NAMESPACE) --timeout=600s
 	-kubectl rollout status deployment/argocd-redis -n $(ARGOCD_NAMESPACE) --timeout=120s
 	kubectl apply -f k8s/argocd/application-my-app.yaml
