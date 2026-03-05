@@ -229,6 +229,8 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
                 if reserved.rowcount != 1:
                     continue
 
+            TASK_STATUS_COUNT.labels(status="pending").dec()
+            TASK_STATUS_COUNT.labels(status="in_progress").inc()
             TASK_TRANSITIONS_TOTAL.labels(
                 from_status="pending",
                 to_status="in_progress",
@@ -244,7 +246,6 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
                 source="worker",
                 processing_delay_seconds=processing_delay_seconds,
             )
-            refresh_status_metrics()
 
             started_at = time.monotonic()
             time.sleep(processing_delay_seconds)
@@ -256,6 +257,8 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
                     updated = conn.execute(query_mark_done, {"task_id": row.id})
                     if updated.rowcount != 1:
                         continue
+                TASK_STATUS_COUNT.labels(status="in_progress").dec()
+                TASK_STATUS_COUNT.labels(status="done").inc()
                 TASK_TRANSITIONS_TOTAL.labels(
                     from_status="in_progress",
                     to_status="done",
@@ -277,6 +280,8 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
                     updated = conn.execute(query_mark_failed, {"task_id": row.id})
                     if updated.rowcount != 1:
                         continue
+                TASK_STATUS_COUNT.labels(status="in_progress").dec()
+                TASK_STATUS_COUNT.labels(status="failed").inc()
                 TASK_TRANSITIONS_TOTAL.labels(
                     from_status="in_progress",
                     to_status="failed",
@@ -294,7 +299,6 @@ def process_pending_tasks_once(limit: int = 10, processing_delay_seconds: Option
                     result="error",
                 )
             processed_count += 1
-            refresh_status_metrics()
         return processed_count
     except SQLAlchemyError as exc:
         log_event("worker_db_error", error=str(exc))

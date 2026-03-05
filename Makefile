@@ -291,14 +291,14 @@ k8s-argocd-status:
 	kubectl get applications.argoproj.io -n $(ARGOCD_NAMESPACE)
 
 k8s-argocd-ui:
-	@echo "Starting ArgoCD UI port-forward in background on http://localhost:$(ARGOCD_UI_PORT) ..."
+	@echo "Starting ArgoCD UI port-forward in background on http://<your-ip>:$(ARGOCD_UI_PORT) ..."
 	@if [ -f /tmp/argocd-port-forward.pid ]; then \
 		PID=$$(cat /tmp/argocd-port-forward.pid); \
 		kill $$PID >/dev/null 2>&1 || true; \
 		rm -f /tmp/argocd-port-forward.pid; \
 	fi
-	@nohup kubectl port-forward -n $(ARGOCD_NAMESPACE) svc/argocd-server $(ARGOCD_UI_PORT):443 >/tmp/argocd-port-forward.log 2>&1 & echo $$! >/tmp/argocd-port-forward.pid
-	@echo "ArgoCD UI is available on http://localhost:$(ARGOCD_UI_PORT)"
+	@nohup kubectl port-forward --address 0.0.0.0 -n $(ARGOCD_NAMESPACE) svc/argocd-server $(ARGOCD_UI_PORT):443 >/tmp/argocd-port-forward.log 2>&1 & echo $$! >/tmp/argocd-port-forward.pid
+	@echo "ArgoCD UI is available on http://<your-ip>:$(ARGOCD_UI_PORT)"
 	@echo "Logs: /tmp/argocd-port-forward.log"
 
 k8s-argocd-ui-stop:

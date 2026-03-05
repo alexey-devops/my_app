@@ -1,3 +1,6 @@
+defaultDashboards:
+  enabled: false
+
 prometheus:
   prometheusSpec:
     retention: 7d

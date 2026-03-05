@@ -92,22 +92,19 @@ def init_db() -> None:
     Base.metadata.create_all(bind=get_engine())
 
 
-def refresh_status_metrics(db: Session) -> None:
-    counts = {status: 0 for status in KNOWN_STATUSES}
-    rows = db.query(Task.status).all()
-    for (status_value,) in rows:
-        if status_value in counts:
-            counts[status_value] += 1
-    for status_name, value in counts.items():
-        TASK_STATUS_COUNT.labels(status=status_name).set(value)
-
-
 @app.on_event("startup")
 def startup_event() -> None:
     init_db()
     session = next(get_db())
     try:
-        refresh_status_metrics(session)
+        # Initialize gauge metrics on startup
+        counts = {status: 0 for status in KNOWN_STATUSES}
+        rows = session.query(Task.status).all()
+        for (status_value,) in rows:
+            if status_value in counts:
+                counts[status_value] += 1
+        for status_name, value in counts.items():
+            TASK_STATUS_COUNT.labels(status=status_name).set(value)
     finally:
         session.close()
 
@@ -187,7 +184,7 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(task)
     TASKS_CREATED_TOTAL.inc()
-    refresh_status_metrics(db)
+    TASK_STATUS_COUNT.labels(status=task.status).inc()
     log_event(
         "task_created",
         task_id=task.id,
@@ -239,7 +236,8 @@ def update_task_status(task_id: int, payload: TaskStatusUpdate, db: Session = De
         from_status=previous_status,
         to_status=task.status,
     ).inc()
-    refresh_status_metrics(db)
+    TASK_STATUS_COUNT.labels(status=previous_status).dec()
+    TASK_STATUS_COUNT.labels(status=task.status).inc()
     log_event(
         "task_status_updated",
         task_id=task.id,
@@ -262,7 +260,7 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
     deleted_status = task.status
     db.delete(task)
     db.commit()
-    refresh_status_metrics(db)
+    TASK_STATUS_COUNT.labels(status=deleted_status).dec()
     log_event(
         "task_deleted",
         task_id=deleted_id,
