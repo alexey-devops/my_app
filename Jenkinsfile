@@ -157,6 +157,9 @@ pipeline {
 
   triggers {
     githubPush()
+    // Fallback when GitHub webhook delivery fails (e.g. temporary network/NAT issues).
+    // Polling does not rebuild the same commit twice; it only runs on unseen revisions.
+    pollSCM('H/2 * * * *')
   }
 
   options {
