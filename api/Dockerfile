@@ -12,10 +12,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Create a non-root user for runtime after dependencies are installed
-RUN adduser --disabled-password --gecos "" appuser \
-    && chown -R appuser:appuser /app
-USER appuser
+# Create a non-root user with a specific UID for runtime
+RUN groupadd --gid 1001 appgroup && \
+    useradd --uid 1001 --gid 1001 --shell /bin/sh --create-home appuser && \
+    chown -R 1001:1001 /app
+USER 1001
 
 EXPOSE 8000
 

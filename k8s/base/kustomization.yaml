@@ -28,3 +28,5 @@ resources:
   - networkpolicy-postgres.yaml
   - networkpolicy-redis.yaml
   - networkpolicy-simulator.yaml
+  - hpa-api.yaml
+  - hpa-worker.yaml
