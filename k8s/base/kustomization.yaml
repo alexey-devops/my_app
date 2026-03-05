@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.example.yaml
+  - postgres-statefulset.yaml
+  - postgres-service.yaml
+  - redis-statefulset.yaml
+  - redis-service.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - api-pdb.yaml
+  - worker-deployment.yaml
+  - worker-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - gateway-configmap.yaml
+  - gateway-deployment.yaml
+  - gateway-service.yaml
+  - gateway-pdb.yaml
+  - networkpolicy-default-deny.yaml
+  - networkpolicy-allow-dns.yaml
+  - networkpolicy-gateway.yaml
+  - networkpolicy-api.yaml
+  - networkpolicy-worker.yaml
+  - networkpolicy-frontend.yaml
+  - networkpolicy-postgres.yaml
+  - networkpolicy-redis.yaml
+  - networkpolicy-simulator.yaml

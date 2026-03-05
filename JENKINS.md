@@ -60,6 +60,11 @@
    - Event: `Just the push event`
 3. Проверь `Recent Deliveries` в GitHub (ожидается HTTP 200).
 
+Дополнительно в `Jenkinsfile` включён `pollSCM('H/2 * * * *')` как fallback.
+Это страхует CI, если webhook временно недоступен (статусы для PR не зависают в `pending`).
+Также Jenkins init-скрипт включает periodic scan для multibranch job `my-app-mb` (по умолчанию `2m`).
+Для multibranch-веток включены index triggers (`overrideIndexTriggers(true)`), чтобы scan мог запускать build новой ревизии.
+
 ## 7) Обязательный gate перед попаданием в `main`
 
 Важно: модель "сначала Jenkins, потом push в GitHub" для GitHub технически невозможна, потому что Jenkins запускается после события в GitHub. Корректный и безопасный вариант: запретить прямые push в `main` и разрешать только merge PR после успешного Jenkins check.

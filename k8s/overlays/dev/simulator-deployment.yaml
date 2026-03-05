@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulator
+  namespace: my-app
+  labels:
+    app.kubernetes.io/component: dev-demo-tool
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simulator
+  template:
+    metadata:
+      labels:
+        app: simulator
+    spec:
+      initContainers:
+        - name: wait-api
+          image: curlimages/curl:8.9.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until curl -fsS "http://api:8000/health" >/dev/null; do
+                echo "waiting for api...";
+                sleep 2;
+              done
+      containers:
+        - name: simulator
+          image: my-app/simulator:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SIMULATOR_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_ENABLED
+            - name: SIMULATOR_API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_API_BASE_URL
+            - name: SIMULATOR_TASK_TITLE_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_TASK_TITLE_PREFIX
+            - name: SIMULATOR_CREATE_MIN_DELAY_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_CREATE_MIN_DELAY_SECONDS
+            - name: SIMULATOR_CREATE_MAX_DELAY_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_CREATE_MAX_DELAY_SECONDS
+            - name: SIMULATOR_STAGE_MIN_DELAY_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_STAGE_MIN_DELAY_SECONDS
+            - name: SIMULATOR_STAGE_MAX_DELAY_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_STAGE_MAX_DELAY_SECONDS
+            - name: SIMULATOR_FAIL_RATE
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_FAIL_RATE
+            - name: SIMULATOR_FAIL_TAG_RATE
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_FAIL_TAG_RATE
+            - name: SIMULATOR_BURST_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_BURST_SIZE
+            - name: SIMULATOR_MAX_TASKS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_MAX_TASKS
+            - name: SIMULATOR_CLEANUP_INTERVAL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: SIMULATOR_CLEANUP_INTERVAL_SECONDS
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi

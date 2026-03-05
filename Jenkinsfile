@@ -157,14 +157,18 @@ pipeline {
 
   triggers {
     githubPush()
+    // Fallback when GitHub webhook delivery fails (e.g. temporary network/NAT issues).
+    // Polling does not rebuild the same commit twice; it only runs on unseen revisions.
+    pollSCM('H/2 * * * *')
   }
 
   options {
     timestamps()
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '30'))
-    // Prevent duplicate rebuilds from Multibranch indexing (e.g. after Jenkins restart).
-    overrideIndexTriggers(false)
+    // Allow Multibranch indexing to trigger builds for new revisions.
+    // Together with periodic scan this guarantees CI runs even when webhook is unreachable.
+    overrideIndexTriggers(true)
   }
 
   environment {
@@ -255,7 +259,79 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
-          docker compose build api worker frontend
+          export DOCKER_BUILDKIT=0
+          IMAGE_TAG="ci-${BUILD_NUMBER:-local}"
+          docker build -t "my-app/api:${IMAGE_TAG}" ./api
+          docker build -t "my-app/worker:${IMAGE_TAG}" ./worker
+          docker build -t "my-app/frontend:${IMAGE_TAG}" ./frontend
+        '''
+      }
+    }
+
+    stage('Security Scan (Trivy)') {
+      steps {
+        sh '''
+          set -euxo pipefail
+          mkdir -p reports/trivy
+          TRIVY_IMAGE="aquasec/trivy:0.58.1"
+          TRIVY_CACHE_VOL="trivy-cache"
+          TRIVY_GATE_SEVERITY="CRITICAL"
+          IMAGE_TAG="ci-${BUILD_NUMBER:-local}"
+          SERVICES="api worker frontend"
+          FAILED=0
+
+          docker volume create "$TRIVY_CACHE_VOL" >/dev/null
+
+          trivy_scan() {
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "${TRIVY_CACHE_VOL}:/root/.cache/trivy" \
+              "$TRIVY_IMAGE" image \
+              --timeout 10m \
+              --scanners vuln \
+              "$@"
+          }
+
+          # Warm up DB once per build to avoid repeated downloads and flaky timing.
+          trivy_scan --download-db-only
+
+          for SVC in $SERVICES; do
+            IMAGE_REF="my-app/${SVC}:${IMAGE_TAG}"
+            if ! docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
+              echo "Built image not found: $IMAGE_REF"
+              FAILED=1
+              continue
+            fi
+
+            trivy_scan \
+              --skip-db-update \
+              --skip-java-db-update \
+              --severity HIGH,CRITICAL \
+              --format json \
+              --exit-code 0 \
+              "$IMAGE_REF" > "reports/trivy-${SVC}.json"
+
+            trivy_scan \
+              --skip-db-update \
+              --skip-java-db-update \
+              --severity HIGH,CRITICAL \
+              --format sarif \
+              --exit-code 0 \
+              "$IMAGE_REF" > "reports/trivy-${SVC}.sarif"
+
+            if ! trivy_scan \
+              --skip-db-update \
+              --skip-java-db-update \
+              --ignore-unfixed \
+              --severity "$TRIVY_GATE_SEVERITY" \
+              --exit-code 1 \
+              "$IMAGE_REF" > "reports/trivy-${SVC}.txt"; then
+              echo "Trivy gate failed for $SVC (${TRIVY_GATE_SEVERITY} found)"
+              FAILED=1
+            fi
+          done
+
+          test "$FAILED" -eq 0
         '''
       }
     }
@@ -287,7 +363,7 @@ pipeline {
       }
     }
     always {
-      archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
+      archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
       deleteDir()
     }
   }
