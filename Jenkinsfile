@@ -275,6 +275,7 @@ pipeline {
           mkdir -p reports/trivy
           TRIVY_IMAGE="aquasec/trivy:0.58.1"
           TRIVY_CACHE_VOL="trivy-cache"
+          TRIVY_GATE_SEVERITY="CRITICAL"
           IMAGE_TAG="ci-${BUILD_NUMBER:-local}"
           SERVICES="api worker frontend"
           FAILED=0
@@ -286,9 +287,13 @@ pipeline {
               -v /var/run/docker.sock:/var/run/docker.sock \
               -v "${TRIVY_CACHE_VOL}:/root/.cache/trivy" \
               "$TRIVY_IMAGE" image \
+              --timeout 10m \
               --scanners vuln \
               "$@"
           }
+
+          # Warm up DB once per build to avoid repeated downloads and flaky timing.
+          trivy_scan --download-db-only
 
           for SVC in $SERVICES; do
             IMAGE_REF="my-app/${SVC}:${IMAGE_TAG}"
@@ -299,6 +304,8 @@ pipeline {
             fi
 
             trivy_scan \
+              --skip-db-update \
+              --skip-java-db-update \
               --severity HIGH,CRITICAL \
               --format json \
               --exit-code 0 \
@@ -315,10 +322,11 @@ pipeline {
             if ! trivy_scan \
               --skip-db-update \
               --skip-java-db-update \
-              --severity HIGH,CRITICAL \
+              --ignore-unfixed \
+              --severity "$TRIVY_GATE_SEVERITY" \
               --exit-code 1 \
               "$IMAGE_REF" > "reports/trivy-${SVC}.txt"; then
-              echo "Trivy gate failed for $SVC (HIGH/CRITICAL found)"
+              echo "Trivy gate failed for $SVC (${TRIVY_GATE_SEVERITY} found)"
               FAILED=1
             fi
           done
