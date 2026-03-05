@@ -272,11 +272,23 @@ pipeline {
       steps {
         sh '''
           set -euxo pipefail
-          mkdir -p reports/trivy .trivycache
+          mkdir -p reports/trivy
           TRIVY_IMAGE="aquasec/trivy:0.58.1"
+          TRIVY_CACHE_VOL="trivy-cache"
           IMAGE_TAG="ci-${BUILD_NUMBER:-local}"
           SERVICES="api worker frontend"
           FAILED=0
+
+          docker volume create "$TRIVY_CACHE_VOL" >/dev/null
+
+          trivy_scan() {
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "${TRIVY_CACHE_VOL}:/root/.cache/trivy" \
+              "$TRIVY_IMAGE" image \
+              --scanners vuln \
+              "$@"
+          }
 
           for SVC in $SERVICES; do
             IMAGE_REF="my-app/${SVC}:${IMAGE_TAG}"
@@ -286,25 +298,23 @@ pipeline {
               continue
             fi
 
-            docker run --rm \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              "$TRIVY_IMAGE" image \
+            trivy_scan \
               --severity HIGH,CRITICAL \
               --format json \
               --exit-code 0 \
               "$IMAGE_REF" > "reports/trivy-${SVC}.json"
 
-            docker run --rm \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              "$TRIVY_IMAGE" image \
+            trivy_scan \
+              --skip-db-update \
+              --skip-java-db-update \
               --severity HIGH,CRITICAL \
               --format sarif \
               --exit-code 0 \
               "$IMAGE_REF" > "reports/trivy-${SVC}.sarif"
 
-            if ! docker run --rm \
-              -v /var/run/docker.sock:/var/run/docker.sock \
-              "$TRIVY_IMAGE" image \
+            if ! trivy_scan \
+              --skip-db-update \
+              --skip-java-db-update \
               --severity HIGH,CRITICAL \
               --exit-code 1 \
               "$IMAGE_REF" > "reports/trivy-${SVC}.txt"; then
