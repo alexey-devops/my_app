@@ -166,8 +166,9 @@ pipeline {
     timestamps()
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '30'))
-    // Prevent duplicate rebuilds from Multibranch indexing (e.g. after Jenkins restart).
-    overrideIndexTriggers(false)
+    // Allow Multibranch indexing to trigger builds for new revisions.
+    // Together with periodic scan this guarantees CI runs even when webhook is unreachable.
+    overrideIndexTriggers(true)
   }
 
   environment {
