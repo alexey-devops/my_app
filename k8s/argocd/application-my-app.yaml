@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/alexey-devops/my_app.git
-    targetRevision: feature
+    targetRevision: main
     path: k8s/overlays/dev
   destination:
     server: https://kubernetes.default.svc
