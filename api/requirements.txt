@@ -2,7 +2,7 @@ fastapi==0.70.0
 uvicorn==0.41.0
 pydantic==1.8.2
 SQLAlchemy==1.4.27
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.11
 requests==2.32.3
 alembic==1.7.5
 prometheus-client==0.20.0
