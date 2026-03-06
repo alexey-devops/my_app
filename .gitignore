@@ -220,7 +220,7 @@ venv/
 *.swo
 
 # Project secrets/certs
-secrets/
+/secrets/
 certs/
 *.pem
 config_output.yaml

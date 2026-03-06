@@ -1,4 +1,4 @@
-.PHONY: build up down compose-up compose-down app-compose-up app-compose-down jenkins-up jenkins-down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-grafana-ui k8s-grafana-ui-stop k8s-main k8s-argocd-install k8s-argocd-status k8s-argocd-ui k8s-argocd-ui-stop
+.PHONY: build up down compose-up compose-down app-compose-up app-compose-down jenkins-up jenkins-down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-grafana-ui k8s-grafana-ui-stop k8s-main k8s-argocd-install k8s-argocd-status k8s-argocd-ui k8s-argocd-ui-stop k8s-eso-install k8s-eso-uninstall
 
 # Default to .env if not specified
 ENV_FILE ?= .env
@@ -15,6 +15,7 @@ ARGOCD_NAMESPACE ?= argocd
 ARGOCD_UI_PORT ?= 8090
 GRAFANA_UI_PORT ?= 3000
 ALLOW_COMPOSE ?= 0
+ESO_NAMESPACE ?= external-secrets
 
 all: up
 
@@ -310,3 +311,16 @@ k8s-argocd-ui-stop:
 	else \
 		echo "No running ArgoCD port-forward pid file found."; \
 	fi
+
+k8s-eso-install:
+	@echo "Installing External Secrets Operator into namespace $(ESO_NAMESPACE)..."
+	kubectl create namespace $(ESO_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	$(HELM) repo add external-secrets https://charts.external-secrets.io
+	$(HELM) repo update
+	$(HELM) upgrade --install external-secrets external-secrets/external-secrets \
+		-n $(ESO_NAMESPACE)
+	@echo "External Secrets Operator installed."
+
+k8s-eso-uninstall:
+	@echo "Uninstalling External Secrets Operator from namespace $(ESO_NAMESPACE)..."
+	-$(HELM) uninstall external-secrets -n $(ESO_NAMESPACE)

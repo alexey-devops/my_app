@@ -3,6 +3,8 @@ kind: StatefulSet
 metadata:
   name: postgres
   namespace: my-app
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   serviceName: postgres
   replicas: 1
@@ -26,17 +28,17 @@ spec:
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: app-secrets
+                  name: postgres-secret
                   key: POSTGRES_DB
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: app-secrets
+                  name: postgres-secret
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: app-secrets
+                  name: postgres-secret
                   key: POSTGRES_PASSWORD
           volumeMounts:
             - name: postgres-data

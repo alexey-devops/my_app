@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: worker
   namespace: my-app
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: 1
   strategy:
@@ -26,12 +28,12 @@ spec:
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: app-secrets
+                  name: postgres-secret
                   key: POSTGRES_DB
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: app-secrets
+                  name: postgres-secret
                   key: POSTGRES_USER
             - name: POSTGRES_HOST
               valueFrom:
@@ -96,13 +98,18 @@ spec:
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: app-secrets
+                  name: postgres-secret
                   key: POSTGRES_DB
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: app-secrets
+                  name: postgres-secret
                   key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
             - name: POSTGRES_HOST
               valueFrom:
                 configMapKeyRef:
@@ -123,11 +130,6 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: REDIS_PORT
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: POSTGRES_PASSWORD
             - name: WORKER_METRICS_PORT
               valueFrom:
                 configMapKeyRef:

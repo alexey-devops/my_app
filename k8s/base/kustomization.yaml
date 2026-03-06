@@ -1,9 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  - ../secrets
   - namespace.yaml
   - configmap.yaml
-  - secret.example.yaml
   - postgres-statefulset.yaml
   - postgres-service.yaml
   - redis-statefulset.yaml
@@ -13,8 +13,10 @@ resources:
   - api-pdb.yaml
   - worker-deployment.yaml
   - worker-service.yaml
+  - worker-pdb.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
+  - frontend-pdb.yaml
   - gateway-configmap.yaml
   - gateway-deployment.yaml
   - gateway-service.yaml
