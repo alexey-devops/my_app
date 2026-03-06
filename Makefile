@@ -32,6 +32,7 @@ up:
 	fi
 	$(MAKE) k8s-build-images
 	$(MAKE) k8s-load-images
+	$(MAKE) k8s-eso-install
 	$(MAKE) k8s-apply
 	$(MAKE) k8s-monitoring-install
 	$(MAKE) k8s-grafana-ui
