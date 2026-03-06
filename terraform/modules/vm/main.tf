@@ -1,6 +1,6 @@
 resource "virtualbox_vm" "node" {
   name     = var.vm_name
-  image    = var.vm_template_uuid
+  url      = var.vm_template_path # Using full path to the .vbox file
   cpus     = var.vm_cpu
   memory   = "${var.vm_memory}mib"
 

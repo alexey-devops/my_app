@@ -3,8 +3,8 @@ variable "vm_name" {
   type        = string
 }
 
-variable "vm_template_uuid" {
-  description = "The UUID of the template VM in VirtualBox"
+variable "vm_template_path" {
+  description = "The full path to the .vbox file of the template VM"
   type        = string
 }
 

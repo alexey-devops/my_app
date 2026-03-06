@@ -2,7 +2,7 @@ module "k8s_node" {
   source = "./modules/vm"
 
   vm_name          = var.vm_name
-  vm_template_uuid = var.vm_template_uuid
+  vm_template_path = var.vm_template_path
   vm_cpu           = var.vm_cpu
   vm_memory        = var.vm_memory
   vm_disk          = var.vm_disk
