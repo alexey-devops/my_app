@@ -1,4 +1,4 @@
-.PHONY: build up down compose-up compose-down app-compose-up app-compose-down jenkins-up jenkins-down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-grafana-ui k8s-grafana-ui-stop k8s-main k8s-argocd-install k8s-argocd-status k8s-argocd-ui k8s-argocd-ui-stop k8s-install-operators k8s-eso-install k8s-eso-uninstall
+.PHONY: build up down compose-up compose-down app-compose-up app-compose-down jenkins-up jenkins-down test clean db-migrate-head db-revision db-upgrade db-downgrade logs ps compose-validate lint-yaml lint-dockerfiles demo-flow k8s-kind-create k8s-kind-delete k8s-build-images k8s-load-images k8s-apply k8s-delete k8s-status k8s-bootstrap k8s-rollout-status k8s-rollout-undo k8s-monitoring-install k8s-monitoring-uninstall k8s-monitoring-status k8s-grafana-ui k8s-grafana-ui-stop k8s-main k8s-argocd-install k8s-argocd-status k8s-argocd-ui k8s-argocd-ui-stop k8s-eso-install k8s-eso-uninstall
 
 # Default to .env if not specified
 ENV_FILE ?= .env
@@ -312,8 +312,6 @@ k8s-argocd-ui-stop:
 		echo "No running ArgoCD port-forward pid file found."; \
 	fi
 
-k8s-install-operators: k8s-eso-install
-
 k8s-eso-install:
 	@echo "Installing External Secrets Operator into namespace $(ESO_NAMESPACE)..."
 	kubectl create namespace $(ESO_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
@@ -321,9 +319,6 @@ k8s-eso-install:
 	$(HELM) repo update
 	$(HELM) upgrade --install external-secrets external-secrets/external-secrets \
 		-n $(ESO_NAMESPACE)
-	@echo "Waiting for External Secrets Operator CRDs to be established..."
-	kubectl wait --for=condition=Established crd/externalsecrets.external-secrets.io --timeout=180s
-	kubectl wait --for=condition=Established crd/secretstores.external-secrets.io --timeout=180s
 	@echo "External Secrets Operator installed."
 
 k8s-eso-uninstall:
