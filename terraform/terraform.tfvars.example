@@ -1,0 +1,10 @@
+# Example variables for creating the Kubernetes node VM.
+# Copy this file to terraform.tfvars and fill in your actual values.
+
+vm_name        = "devops-k8s-node"
+vm_cpu         = 2
+vm_memory      = 4096
+vm_disk        = 40
+vm_ip          = "192.168.1.50"
+ssh_user       = "ubuntu"
+ssh_public_key = "ssh-rsa AAAA..."

@@ -19,6 +19,55 @@
   - срабатывает вероятностная ошибка `WORKER_FAILURE_RATE`.
 - Для `failed` в UI доступен `Retry` (перевод обратно в `pending`).
 
+## Infrastructure provisioning
+
+This project uses Terraform to provision the underlying infrastructure (a Virtual Machine) needed to run the Kubernetes cluster.
+
+### Prerequisites
+
+- Terraform >= 1.0
+- A configured hypervisor provider (e.g., Proxmox, VirtualBox). The code is set up with a placeholder and needs to be adapted for your specific environment.
+
+### Usage
+
+1.  **Navigate to the Terraform directory:**
+    ```bash
+    cd terraform
+    ```
+
+2.  **Initialize Terraform:**
+    This downloads the necessary providers.
+    ```bash
+    terraform init
+    ```
+
+3.  **Configure your environment:**
+    Copy the example variables file and adjust it to your needs. Pay special attention to the IP address and your public SSH key.
+    ```bash
+    cp terraform.tfvars.example terraform.tfvars
+    # Edit terraform.tfvars with your values
+    ```
+
+4.  **Review the plan:**
+    See what resources Terraform will create.
+    ```bash
+    terraform plan
+    ```
+
+5.  **Apply the changes:**
+    Create the virtual machine.
+    ```bash
+    terraform apply
+    ```
+
+6.  **Destroy the infrastructure:**
+    To tear down the created VM, use:
+    ```bash
+    terraform destroy
+    ```
+
+After applying, Terraform will output the IP address and a full SSH command to connect to the newly created machine, which is now ready for the next step (Ansible bootstrapping).
+
 ## Быстрый старт
 
 1. Создать `.env`:
